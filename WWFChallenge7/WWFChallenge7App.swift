@@ -1,17 +1,22 @@
-//
-//  WWFChallenge7App.swift
-//  WWFChallenge7
-//
-//  Created by Luca Pagano on 06/05/26.
-//
-
 import SwiftUI
+import SwiftData
 
 @main
 struct WWFChallenge7App: App {
+    let container: ModelContainer
+
+    init() {
+        do {
+            container = try ModelContainer(for: Trail.self, POI.self, TrailStep.self)
+        } catch {
+            fatalError("SwiftData container failed: \(error)")
+        }
+    }
+
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            RootView()
+                .modelContainer(container)
         }
     }
 }
