@@ -8,14 +8,24 @@ final class Trail {
     var trailDescription: String
     var difficulty: TrailDifficulty
     var estimatedMinutes: Int
-    var steps: [TrailStep]       // ordinati per orderIndex
-    var isActive: Bool           // visibile ai visitatori
+    var steps: [TrailStep]
+    var isActive: Bool
+
+    // Punto di partenza definito dal gestore
+    var startPointName: String
+    var startPointDescription: String
+    var startX: Double  // normalizzato 0.0-1.0
+    var startY: Double  // normalizzato 0.0-1.0
 
     init(
         name: String,
         description: String,
         difficulty: TrailDifficulty = .easy,
-        estimatedMinutes: Int = 60
+        estimatedMinutes: Int = 60,
+        startPointName: String = "Punto di partenza",
+        startPointDescription: String = "Inizia qui il tuo percorso.",
+        startX: Double = 0.1,
+        startY: Double = 0.9
     ) {
         self.id = UUID()
         self.name = name
@@ -24,9 +34,12 @@ final class Trail {
         self.estimatedMinutes = estimatedMinutes
         self.steps = []
         self.isActive = false
+        self.startPointName = startPointName
+        self.startPointDescription = startPointDescription
+        self.startX = startX
+        self.startY = startY
     }
 
-    // Step corrente durante la navigazione (il primo non ancora completato)
     func currentStep(completedPOIIds: Set<UUID>) -> TrailStep? {
         steps
             .sorted { $0.orderIndex < $1.orderIndex }
@@ -42,9 +55,9 @@ final class Trail {
 }
 
 enum TrailDifficulty: String, Codable, CaseIterable {
-    case easy     = "Facile"
-    case medium   = "Medio"
-    case hard     = "Difficile"
+    case easy   = "Facile"
+    case medium = "Medio"
+    case hard   = "Difficile"
 
     var color: String {
         switch self {

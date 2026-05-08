@@ -1,3 +1,11 @@
+//
+//  POIEditorMode.swift
+//  WWFChallenge7
+//
+//  Created by Luca Pagano on 06/05/26.
+//
+
+
 import SwiftUI
 import PhotosUI
 
@@ -20,6 +28,7 @@ struct POIEditorView: View {
     @State private var photoData: Data? = nil
     @State private var showDeleteConfirm = false
     @State private var showQR = false
+    @State private var isStartPoint = false
 
     private var existingPOI: POI? {
         if case .edit(let p) = mode { return p }
@@ -57,6 +66,9 @@ struct POIEditorView: View {
                         }
                     }
                     .pickerStyle(.menu)
+                    
+                    Toggle("Punto di partenza", isOn: $isStartPoint)
+                        .tint(Color("WWFGreen"))
                 }
 
                 // MARK: Foto
@@ -151,18 +163,20 @@ struct POIEditorView: View {
         description = poi.poiDescription
         type = poi.type
         photoData = poi.photoData
+        isStartPoint = poi.isStartPoint
     }
 
     private func savePOI() {
         switch mode {
         case .create(let x, let y):
-            let poi = POI(name: name, description: description, x: x, y: y, type: type, photoData: photoData)
+            let poi = POI(name: name, description: description, x: x, y: y, type: type, photoData: photoData, isStartPoint: isStartPoint)
             onSave(poi)
         case .edit(let poi):
             poi.name = name
             poi.poiDescription = description
             poi.type = type
             poi.photoData = photoData
+            poi.isStartPoint = isStartPoint
             onSave(poi)
         }
     }

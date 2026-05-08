@@ -1,3 +1,11 @@
+//
+//  POI.swift
+//  WWFChallenge7
+//
+//  Created by Luca Pagano on 06/05/26.
+//
+
+
 import Foundation
 import SwiftData
 import CoreGraphics
@@ -7,11 +15,12 @@ final class POI {
     var id: UUID
     var name: String
     var poiDescription: String
-    var x: Double // posizione normalizzata sulla mappa (0.0 - 1.0)
+    var x: Double
     var y: Double
     var type: POIType
     var photoData: Data?
-    var qrPayload: String // stringa univoca encodata nel QR fisico
+    var qrPayload: String
+    var isStartPoint: Bool  
 
     init(
         name: String,
@@ -19,16 +28,20 @@ final class POI {
         x: Double,
         y: Double,
         type: POIType = .generic,
-        photoData: Data? = nil
+        photoData: Data? = nil,
+        isStartPoint: Bool = false,
+        fixedID: UUID? = nil
     ) {
-        self.id = UUID()
+        let newID = fixedID ?? UUID()
+        self.id = newID
         self.name = name
         self.poiDescription = description
         self.x = x
         self.y = y
         self.type = type
         self.photoData = photoData
-        self.qrPayload = "ASTRONI_POI_\(self.id.uuidString)"
+        self.qrPayload = "ASTRONI_POI_\(newID.uuidString)"
+        self.isStartPoint = isStartPoint
     }
 }
 

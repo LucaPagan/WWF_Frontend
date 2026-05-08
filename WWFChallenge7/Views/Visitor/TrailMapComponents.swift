@@ -14,49 +14,10 @@ import SwiftUI
 
 struct MapPlaceholderView: View {
     var body: some View {
-        ZStack {
-            LinearGradient(
-                colors: [
-                    Color(red: 0.18, green: 0.38, blue: 0.18),
-                    Color(red: 0.28, green: 0.52, blue: 0.22),
-                    Color(red: 0.38, green: 0.62, blue: 0.28)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-
-            Canvas { context, size in
-                let step: CGFloat = 60
-                var x: CGFloat = 0
-                while x < size.width {
-                    var path = Path()
-                    path.move(to: CGPoint(x: x, y: 0))
-                    path.addLine(to: CGPoint(x: x, y: size.height))
-                    context.stroke(path, with: .color(.white.opacity(0.05)), lineWidth: 1)
-                    x += step
-                }
-                var y: CGFloat = 0
-                while y < size.height {
-                    var path = Path()
-                    path.move(to: CGPoint(x: 0, y: y))
-                    path.addLine(to: CGPoint(x: size.width, y: y))
-                    context.stroke(path, with: .color(.white.opacity(0.05)), lineWidth: 1)
-                    y += step
-                }
-            }
-
-            VStack(spacing: 8) {
-                Image(systemName: "map.fill")
-                    .font(.system(size: 48))
-                    .foregroundColor(.white.opacity(0.3))
-                Text("Mappa Oasi degli Astroni")
-                    .font(.caption)
-                    .foregroundColor(.white.opacity(0.4))
-                Text("Inserire asset «astroni_map»")
-                    .font(.caption2)
-                    .foregroundColor(.white.opacity(0.25))
-            }
-        }
+        Image("astroni_map")
+            .resizable()
+            .scaledToFill()
+            .clipped()
     }
 }
 
@@ -69,7 +30,6 @@ struct TrailPathOverlay: View {
 
     var body: some View {
         Canvas { context, _ in
-            // Punti: start → poi1 → poi2 → ...
             var points: [CGPoint] = [
                 CGPoint(x: trail.startX * size.width, y: trail.startY * size.height)
             ]
@@ -88,11 +48,9 @@ struct TrailPathOverlay: View {
                 // Il tratto è grigio se il segmento è già percorso
                 let segmentCompleted: Bool = {
                     guard i > 0 else {
-                        // Tratto start→primo POI: completato se il primo POI è fatto
                         return trail.sortedSteps.first?.poi
                             .map { completedPOIIds.contains($0.id) } ?? false
                     }
-                    // Tratto poiN→poiN+1: completato se poiN è fatto
                     let fromPOI = trail.sortedSteps[i - 1].poi
                     return fromPOI.map { completedPOIIds.contains($0.id) } ?? false
                 }()

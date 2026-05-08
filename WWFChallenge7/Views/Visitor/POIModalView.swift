@@ -2,6 +2,7 @@ import SwiftUI
 
 struct POIModalView: View {
     let poi: POI
+    var onContinue: (() -> Void)? = nil
     @Environment(\.dismiss) private var dismiss
 
     var accentColor: Color {
@@ -13,12 +14,11 @@ struct POIModalView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
 
-                    // Header colorato
+                    // Header
                     ZStack {
                         RoundedRectangle(cornerRadius: 16)
                             .fill(accentColor.opacity(0.15))
                             .frame(height: 120)
-
                         HStack(spacing: 20) {
                             ZStack {
                                 Circle()
@@ -28,7 +28,6 @@ struct POIModalView: View {
                                     .font(.title2)
                                     .foregroundColor(.white)
                             }
-
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(poi.name)
                                     .font(.title2)
@@ -48,7 +47,7 @@ struct POIModalView: View {
                     }
                     .padding(.horizontal)
 
-                    // Foto (se presente)
+                    // Foto
                     if let data = poi.photoData, let uiImg = UIImage(data: data) {
                         Image(uiImage: uiImg)
                             .resizable()
@@ -69,7 +68,12 @@ struct POIModalView: View {
                     }
                     .padding(.horizontal)
 
-                    // Badge "posizione aggiornata"
+                    // ── Predisposizione esperienze AR ─────────────────────────
+
+                    ARPlaceholderBanner()
+                        .padding(.horizontal)
+
+                    // Badge posizione aggiornata
                     HStack {
                         Image(systemName: "location.fill.viewfinder")
                             .foregroundColor(.green)
@@ -79,7 +83,20 @@ struct POIModalView: View {
                     }
                     .padding(.horizontal)
 
-                    Spacer(minLength: 40)
+                    // CTA continua
+                    Button {
+                        onContinue?() ?? dismiss()
+                    } label: {
+                        Label("Continua il percorso", systemImage: "arrow.right.circle.fill")
+                            .font(.headline)
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color("WWFGreen"))
+                            .clipShape(RoundedRectangle(cornerRadius: 14))
+                    }
+                    .padding(.horizontal)
+                    .padding(.bottom, 32)
                 }
                 .padding(.top)
             }
@@ -87,10 +104,36 @@ struct POIModalView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Continua") { dismiss() }
-                        .foregroundColor(Color("WWFGreen"))
+                    Button("Chiudi") {
+                        onContinue?() ?? dismiss()
+                    }
+                    .foregroundColor(Color("WWFGreen"))
                 }
             }
         }
+    }
+}
+
+// Banner placeholder AR
+struct ARPlaceholderBanner: View {
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "arkit")
+                .font(.title3)
+                .foregroundColor(.purple)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Esperienza AR disponibile a breve")
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.purple)
+                Text("Questo punto avrà contenuti in realtà aumentata.")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+            }
+            Spacer()
+        }
+        .padding()
+        .background(Color.purple.opacity(0.08))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 }

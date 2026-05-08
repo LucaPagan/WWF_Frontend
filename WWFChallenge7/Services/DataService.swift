@@ -1,3 +1,11 @@
+//
+//  DataService.swift
+//  WWFChallenge7
+//
+//  Created by Luca Pagano on 06/05/26.
+//
+
+
 import Foundation
 import SwiftData
 
@@ -11,35 +19,48 @@ class DataService {
         guard existing.isEmpty else { return }
 
         // --- POI di esempio ---
+        // ⚠️ Gli UUID sono FISSI e deterministici: così il qrPayload rimane sempre
+        // identico tra un reset dello store e l'altro, mantenendo validi i QR stampati.
+        let fixedID1 = UUID(uuidString: "A1000001-0000-0000-0000-000000000001")!
+        let fixedID2 = UUID(uuidString: "A1000001-0000-0000-0000-000000000002")!
+        let fixedID3 = UUID(uuidString: "A1000001-0000-0000-0000-000000000003")!
+        let fixedID4 = UUID(uuidString: "A1000001-0000-0000-0000-000000000004")!
+        let fixedID5 = UUID(uuidString: "A1000001-0000-0000-0000-000000000005")!
+
         let poi1 = POI(
             name: "Ingresso Principale",
             description: "Punto di partenza ufficiale. Qui inizia la tua avventura nell'Oasi degli Astroni.",
             x: 0.15, y: 0.85,
-            type: .service
+            type: .service,
+            fixedID: fixedID1
         )
         let poi2 = POI(
             name: "Cratere Centrale",
             description: "Il cuore vulcanico degli Astroni. Osserva la vegetazione rigogliosa che colonizza l'antico cratere.",
             x: 0.50, y: 0.50,
-            type: .nature
+            type: .nature,
+            fixedID: fixedID2
         )
         let poi3 = POI(
             name: "Belvedere Nord",
             description: "Da qui puoi ammirare l'intera oasi e, nelle giornate limpide, il Golfo di Pozzuoli.",
             x: 0.55, y: 0.20,
-            type: .viewpoint
+            type: .viewpoint,
+            fixedID: fixedID3
         )
         let poi4 = POI(
             name: "Laghetto degli Astroni",
             description: "Piccolo specchio d'acqua naturale, habitat fondamentale per anfibi e uccelli acquatici.",
             x: 0.35, y: 0.60,
-            type: .nature
+            type: .nature,
+            fixedID: fixedID4
         )
         let poi5 = POI(
             name: "Area Picnic",
             description: "Zona attrezzata per una pausa. Rispetta l'ambiente: non lasciare rifiuti.",
             x: 0.75, y: 0.75,
-            type: .service
+            type: .service,
+            fixedID: fixedID5
         )
 
         context.insert(poi1)
@@ -80,6 +101,55 @@ class DataService {
         trail2.steps = [step2a, step2b, step2c]
         trail2.isActive = true
         context.insert(trail2)
+
+        // --- Eventi di esempio ---
+        let eventDescriptor = FetchDescriptor<Event>()
+        let existingEvents = (try? context.fetch(eventDescriptor)) ?? []
+        if existingEvents.isEmpty {
+            let cal = Calendar.current
+
+            // Evento 1: Birdwatching all'alba — domani
+            let tomorrow = cal.date(byAdding: .day, value: 1, to: Date()) ?? Date()
+            let event1 = Event(
+                name: "Birdwatching all'Alba",
+                description: "Esplora l'avifauna dell'Oasi accompagnato da un ornitologo esperto. Binocoli forniti dall'organizzazione.",
+                category: .birdwatching,
+                date: tomorrow,
+                startTime: cal.date(bySettingHour: 6, minute: 30, second: 0, of: tomorrow) ?? tomorrow,
+                endTime: cal.date(bySettingHour: 9, minute: 0, second: 0, of: tomorrow) ?? tomorrow,
+                maxParticipants: 20,
+                organizerName: "WWF Campania",
+                contactInfo: "eventi@wwfcampania.it",
+                requirements: "Scarpe comode, abbigliamento mimetico, crema solare. Binocoli disponibili.",
+                targetAudience: "Tutti",
+                price: "Gratuito"
+            )
+            event1.isActive = true
+            event1.trail = trail1
+            event1.eventPOI = poi3
+            context.insert(event1)
+
+            // Evento 2: Laboratorio natura per bambini — fra 3 giorni
+            let inThreeDays = cal.date(byAdding: .day, value: 3, to: Date()) ?? Date()
+            let event2 = Event(
+                name: "Piccoli Naturalisti",
+                description: "Laboratorio interattivo per bambini: scopriamo le piante, gli insetti e gli animali dell'Oasi con giochi e attività pratiche.",
+                category: .kids,
+                date: inThreeDays,
+                startTime: cal.date(bySettingHour: 10, minute: 0, second: 0, of: inThreeDays) ?? inThreeDays,
+                endTime: cal.date(bySettingHour: 12, minute: 30, second: 0, of: inThreeDays) ?? inThreeDays,
+                maxParticipants: 15,
+                organizerName: "WWF Campania – Settore Educazione",
+                contactInfo: "edu@wwfcampania.it",
+                requirements: "Abbigliamento comodo, cappellino, merenda.",
+                targetAudience: "Bambini 6-12",
+                price: "€5.00"
+            )
+            event2.isActive = true
+            event2.trail = trail2
+            event2.eventPOI = poi4
+            context.insert(event2)
+        }
 
         try? context.save()
     }

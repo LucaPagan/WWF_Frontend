@@ -1,3 +1,11 @@
+//
+//  QRScannerView.swift
+//  WWFChallenge7
+//
+//  Created by Luca Pagano on 06/05/26.
+//
+
+
 import SwiftUI
 import AVFoundation
 
@@ -18,12 +26,24 @@ final class QRScannerViewController: UIViewController, AVCaptureMetadataOutputOb
 
     private var captureSession: AVCaptureSession?
     private var previewLayer: AVCaptureVideoPreviewLayer?
+    private var hasScanned = false   
 
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .black
         setupSession()
         addOverlay()
+    }
+
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        // Reset del flag ogni volta che lo scanner viene mostrato
+        hasScanned = false
+        if captureSession?.isRunning == false {
+            DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+                self?.captureSession?.startRunning()
+            }
+        }
     }
 
     private func setupSession() {
@@ -88,10 +108,12 @@ final class QRScannerViewController: UIViewController, AVCaptureMetadataOutputOb
                         didOutput metadataObjects: [AVMetadataObject],
                         from connection: AVCaptureConnection) {
         guard
+            !hasScanned,
             let obj = metadataObjects.first as? AVMetadataMachineReadableCodeObject,
             let value = obj.stringValue
         else { return }
 
+        hasScanned = true
         captureSession?.stopRunning()
         onScan?(value)
     }

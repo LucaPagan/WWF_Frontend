@@ -1,3 +1,11 @@
+//
+//  TrailDetailView.swift
+//  WWFChallenge7
+//
+//  Created by Luca Pagano on 06/05/26.
+//
+
+
 import SwiftUI
 
 struct TrailDetailView: View {

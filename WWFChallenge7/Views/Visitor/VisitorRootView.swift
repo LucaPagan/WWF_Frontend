@@ -20,18 +20,23 @@ struct VisitorRootView: View {
                 }
                 .tag(0)
 
+            EventListView()
+                .tabItem {
+                    Label("Eventi", systemImage: "calendar.badge.clock")
+                }
+                .tag(1)
+
             ProfileView()
                 .tabItem {
                     Label("Profilo", systemImage: "person.fill")
                 }
-                .tag(1)
+                .tag(2)
 
-            // Accesso nascosto al gestionale — tap 5 volte sull'icona impostazioni
             ManagerLoginView()
                 .tabItem {
                     Label("Gestione", systemImage: "gearshape.fill")
                 }
-                .tag(2)
+                .tag(3)
         }
         .accentColor(Color("WWFGreen"))
     }

@@ -7,9 +7,25 @@ struct WWFChallenge7App: App {
 
     init() {
         do {
-            container = try ModelContainer(for: Trail.self, POI.self, TrailStep.self)
+            // Configurazione con migrazione automatica abilitata
+            let schema = Schema([Trail.self, POI.self, TrailStep.self, Event.self])
+            let config = ModelConfiguration(
+                schema: schema,
+                isStoredInMemoryOnly: false,
+                allowsSave: true
+            )
+            container = try ModelContainer(for: schema, configurations: config)
         } catch {
-            fatalError("SwiftData container failed: \(error)")
+            // Se la migrazione fallisce, cancella lo store e riparte pulito
+            // Questo elimina tutti i dati salvati — ok per prototipo
+            Self.deleteStore()
+            do {
+                let schema = Schema([Trail.self, POI.self, TrailStep.self, Event.self])
+                let config = ModelConfiguration(schema: schema)
+                container = try ModelContainer(for: schema, configurations: config)
+            } catch {
+                fatalError("SwiftData container failed anche dopo reset: \(error)")
+            }
         }
     }
 
@@ -17,6 +33,23 @@ struct WWFChallenge7App: App {
         WindowGroup {
             RootView()
                 .modelContainer(container)
+        }
+    }
+
+    // Cancella il file .store dal disco
+    private static func deleteStore() {
+        let urls = FileManager.default
+            .urls(for: .applicationSupportDirectory, in: .userDomainMask)
+        guard let base = urls.first else { return }
+
+        let storeFiles = [
+            "default.store",
+            "default.store-shm",
+            "default.store-wal"
+        ]
+        for file in storeFiles {
+            let url = base.appendingPathComponent(file)
+            try? FileManager.default.removeItem(at: url)
         }
     }
 }

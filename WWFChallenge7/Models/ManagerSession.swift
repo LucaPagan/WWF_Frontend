@@ -1,15 +1,20 @@
-import Foundation
+//
+//  ManagerSession.swift
+//  WWFChallenge7
+//
+//  Created by Luca Pagano on 06/05/26.
+//
 
-// Gestione sessione gestore WWF — nessun backend, credenziali locali
-// Per produzione: sostituire con Firebase Auth o equivalente
+
+import Foundation
+import Combine   // ← aggiunge questo
+
 class ManagerSession: ObservableObject {
     @Published var isLoggedIn: Bool = false
     @Published var loginError: String? = nil
 
-    // Credenziali hardcoded per prototipo
-    // ⚠️ In produzione: sostituire con sistema di auth reale
     private let validEmail    = "gestore@wwf.it"
-    private let validPassword = "Astroni2024!"
+    private let validPassword = "Astroni"
 
     func login(email: String, password: String) {
         if email == validEmail && password == validPassword {

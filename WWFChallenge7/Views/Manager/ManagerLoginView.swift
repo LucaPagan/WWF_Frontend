@@ -1,11 +1,3 @@
-//
-//  ManagerLoginView.swift
-//  WWFChallenge7
-//
-//  Created by Luca Pagano on 06/05/26.
-//
-
-
 import SwiftUI
 
 struct ManagerLoginView: View {
@@ -22,7 +14,6 @@ struct ManagerLoginView: View {
             ScrollView {
                 VStack(spacing: 32) {
 
-                    // Logo
                     VStack(spacing: 12) {
                         ZStack {
                             Circle()
@@ -41,7 +32,6 @@ struct ManagerLoginView: View {
                     }
                     .padding(.top, 48)
 
-                    // Form
                     VStack(spacing: 16) {
                         VStack(alignment: .leading, spacing: 6) {
                             Text("Email").font(.caption).foregroundColor(.secondary)
@@ -102,12 +92,12 @@ struct ManagerLoginView: View {
                                 .frame(maxWidth: .infinity)
                                 .padding()
                                 .background(
-                                    email.isEmpty || password.isEmpty
-                                        ? Color.gray
-                                        : Color("WWFGreen")
+                                    // ← validazione diretta sui binding, nessun computed property
+                                    (email.isEmpty || password.isEmpty) ? Color.gray : Color("WWFGreen")
                                 )
                                 .clipShape(RoundedRectangle(cornerRadius: 14))
                         }
+                        // ← disabled separato così reagisce ai cambiamenti di stato
                         .disabled(email.isEmpty || password.isEmpty)
                     }
                     .padding(.horizontal)
