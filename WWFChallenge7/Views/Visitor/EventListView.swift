@@ -126,7 +126,7 @@ struct EventCardView: View {
     let isHighlighted: Bool
 
     var categoryColor: Color {
-        Color(hex: event.category.color) ?? .green
+        event.category.color
     }
 
     var body: some View {
@@ -188,11 +188,15 @@ struct EventCardView: View {
                     .font(.caption)
                     .foregroundColor(.secondary)
 
-                if event.price != "" {
-                    Label(event.price, systemImage: "eurosign.circle")
+                if event.price > 0 {
+                    Label(String(format: "%.2f €", event.price), systemImage: "eurosign.circle")
                         .font(.caption)
-                        .foregroundColor(event.price.lowercased() == "gratuito" ? .green : .secondary)
-                        .fontWeight(event.price.lowercased() == "gratuito" ? .semibold : .regular)
+                        .foregroundColor(.secondary)
+                } else {
+                    Label("Gratuito", systemImage: "eurosign.circle")
+                        .font(.caption)
+                        .foregroundColor(.green)
+                        .fontWeight(.semibold)
                 }
             }
 

@@ -143,8 +143,12 @@ struct QuickInfoChip: View {
 struct TrailCardView: View {
     let trail: Trail
 
+    var difficulty: TrailDifficulty {
+        trail.difficulty ?? .easy
+    }
+
     var difficultyColor: Color {
-        switch trail.difficulty {
+        switch difficulty {
         case .easy:   return .green
         case .medium: return .orange
         case .hard:   return .red
@@ -171,13 +175,13 @@ struct TrailCardView: View {
 
             HStack(spacing: 16) {
                 // Difficoltà
-                Label(trail.difficulty.rawValue, systemImage: trail.difficulty.icon)
+                Label(difficulty.rawValue, systemImage: difficulty.icon)
                     .font(.caption)
                     .fontWeight(.semibold)
                     .foregroundColor(difficultyColor)
 
                 // Durata
-                Label("\(trail.estimatedMinutes) min", systemImage: "clock")
+                Label("\(trail.estimatedMinutes ?? 60) min", systemImage: "clock")
                     .font(.caption)
                     .foregroundColor(.secondary)
 

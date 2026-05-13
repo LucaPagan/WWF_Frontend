@@ -29,10 +29,17 @@ struct WWFChallenge7App: App {
         }
     }
 
+    @StateObject private var syncManager = SyncManager()
+
     var body: some Scene {
         WindowGroup {
-            RootView()
+            VisitorRootView()
                 .modelContainer(container)
+                .environmentObject(syncManager)
+                .task {
+                    syncManager.configure(with: container.mainContext)
+                    await syncManager.pullLatestData()
+                }
         }
     }
 

@@ -32,11 +32,7 @@ struct VisitorRootView: View {
                 }
                 .tag(2)
 
-            ManagerLoginView()
-                .tabItem {
-                    Label("Gestione", systemImage: "gearshape.fill")
-                }
-                .tag(3)
+
         }
         .accentColor(Color("WWFGreen"))
     }

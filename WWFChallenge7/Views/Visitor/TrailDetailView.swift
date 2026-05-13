@@ -13,8 +13,12 @@ struct TrailDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var startTrail = false
 
+    var difficulty: TrailDifficulty {
+        trail.difficulty ?? .easy
+    }
+
     var difficultyColor: Color {
-        switch trail.difficulty {
+        switch difficulty {
         case .easy:   return .green
         case .medium: return .orange
         case .hard:   return .red
@@ -45,7 +49,7 @@ struct TrailDetailView: View {
                                 .foregroundColor(.white)
 
                             HStack {
-                                Label(trail.difficulty.rawValue, systemImage: trail.difficulty.icon)
+                                Label(difficulty.rawValue, systemImage: difficulty.icon)
                                     .foregroundColor(difficultyColor)
                                     .font(.subheadline)
                                     .fontWeight(.semibold)
@@ -54,7 +58,7 @@ struct TrailDetailView: View {
                                     .background(Color.white.opacity(0.2))
                                     .clipShape(Capsule())
 
-                                Label("\(trail.estimatedMinutes) min", systemImage: "clock")
+                                Label("\(trail.estimatedMinutes ?? 60) min", systemImage: "clock")
                                     .foregroundColor(.white.opacity(0.9))
                                     .font(.subheadline)
                             }

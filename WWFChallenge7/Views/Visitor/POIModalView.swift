@@ -6,7 +6,7 @@ struct POIModalView: View {
     @Environment(\.dismiss) private var dismiss
 
     var accentColor: Color {
-        Color(hex: poi.type.color) ?? .green
+        poi.type.color
     }
 
     var body: some View {

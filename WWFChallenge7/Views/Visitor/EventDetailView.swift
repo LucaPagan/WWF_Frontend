@@ -13,7 +13,7 @@ struct EventDetailView: View {
     @State private var startTrail = false
 
     var categoryColor: Color {
-        Color(hex: event.category.color) ?? .green
+        event.category.color
     }
 
     var body: some View {
@@ -69,10 +69,14 @@ struct EventDetailView: View {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 10) {
                             EventInfoChip(icon: "person.2.fill", text: "Max \(event.maxParticipants)", color: .blue)
-                            EventInfoChip(icon: "eurosign.circle.fill", text: event.price, color: event.price.lowercased() == "gratuito" ? .green : .orange)
-                            EventInfoChip(icon: "person.crop.circle.fill", text: event.targetAudience, color: .purple)
+                            if event.price > 0 {
+                                EventInfoChip(icon: "eurosign.circle.fill", text: String(format: "%.2f €", event.price), color: .orange)
+                            } else {
+                                EventInfoChip(icon: "eurosign.circle.fill", text: "Gratuito", color: .green)
+                            }
+                            EventInfoChip(icon: "person.crop.circle.fill", text: event.targetAudience.rawValue, color: .purple)
                             if let poi = event.eventPOI {
-                                EventInfoChip(icon: poi.type.icon, text: poi.name, color: Color(hex: poi.type.color) ?? .green)
+                                EventInfoChip(icon: poi.type.icon, text: poi.name, color: poi.type.color)
                             }
                         }
                         .padding(.horizontal)
@@ -89,23 +93,23 @@ struct EventDetailView: View {
                     .padding(.horizontal)
 
                     // MARK: Organizzazione
-                    if !event.organizerName.isEmpty || !event.contactInfo.isEmpty {
+                    if !(event.organizerName?.isEmpty ?? true) || !(event.contactInfo?.isEmpty ?? true) {
                         VStack(alignment: .leading, spacing: 10) {
                             Text("Organizzazione")
                                 .font(.headline)
-                            if !event.organizerName.isEmpty {
+                            if let organizer = event.organizerName, !organizer.isEmpty {
                                 HStack(spacing: 10) {
                                     Image(systemName: "building.2.fill")
                                         .foregroundColor(.blue)
-                                    Text(event.organizerName)
+                                    Text(organizer)
                                         .font(.subheadline)
                                 }
                             }
-                            if !event.contactInfo.isEmpty {
+                            if let contact = event.contactInfo, !contact.isEmpty {
                                 HStack(spacing: 10) {
                                     Image(systemName: "envelope.fill")
                                         .foregroundColor(.green)
-                                    Text(event.contactInfo)
+                                    Text(contact)
                                         .font(.subheadline)
                                         .foregroundColor(.secondary)
                                 }
@@ -115,14 +119,14 @@ struct EventDetailView: View {
                     }
 
                     // MARK: Requisiti
-                    if !event.requirements.isEmpty {
+                    if let reqs = event.requirements, !reqs.isEmpty {
                         VStack(alignment: .leading, spacing: 8) {
                             Text("Cosa portare")
                                 .font(.headline)
                             HStack(alignment: .top, spacing: 10) {
                                 Image(systemName: "backpack.fill")
                                     .foregroundColor(.orange)
-                                Text(event.requirements)
+                                Text(reqs)
                                     .font(.subheadline)
                                     .foregroundColor(.secondary)
                             }
@@ -227,8 +231,12 @@ struct EventDetailView: View {
 struct TrailEventCard: View {
     let trail: Trail
 
+    var difficulty: TrailDifficulty {
+        trail.difficulty ?? .easy
+    }
+
     var difficultyColor: Color {
-        switch trail.difficulty {
+        switch difficulty {
         case .easy:   return .green
         case .medium: return .orange
         case .hard:   return .red
@@ -250,11 +258,11 @@ struct TrailEventCard: View {
             }
 
             HStack(spacing: 14) {
-                Label(trail.difficulty.rawValue, systemImage: trail.difficulty.icon)
+                Label(difficulty.rawValue, systemImage: difficulty.icon)
                     .font(.caption)
                     .fontWeight(.semibold)
                     .foregroundColor(difficultyColor)
-                Label("\(trail.estimatedMinutes) min", systemImage: "clock")
+                Label("\(trail.estimatedMinutes ?? 60) min", systemImage: "clock")
                     .font(.caption)
                     .foregroundColor(.secondary)
                 Label("\(trail.steps.count) tappe", systemImage: "mappin.and.ellipse")
