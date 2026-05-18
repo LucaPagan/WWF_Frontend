@@ -1,12 +1,13 @@
 import SwiftUI
 import UIKit
+internal import _LocationEssentials
 
-// MARK: - VisitorMapView (UIScrollView wrapper — same approach as MapEditorView)
+// MARK: - VisitorMapView (UIScrollView wrapper)
 
-/// Uses the same UIScrollView-based rendering as the manager's InteractiveMapView
-/// to guarantee pixel-perfect POI alignment. Markers scale dynamically with zoom,
-/// trail paths are drawn in the image coordinate space, and the user location
-/// indicator pulses correctly.
+/// Utilizza lo stesso approccio basato su UIScrollView del MapEditorView del manager
+/// per garantire un allineamento perfetto dei POI. I marker scalano dinamicamente con lo zoom,
+/// i percorsi (trail paths) sono disegnati nello spazio coordinate dell'immagine e
+/// l'indicatore di posizione dell'utente pulsa correttamente.
 struct VisitorMapView: UIViewRepresentable {
     let trail: Trail
     let completedPOIIds: Set<UUID>
@@ -28,21 +29,63 @@ struct VisitorMapView: UIViewRepresentable {
         scrollView.decelerationRate = .normal
         scrollView.minimumZoomScale = 0.5
         scrollView.maximumZoomScale = 8.0
+        
+        // Add content insets so the user can pan the map freely past the edges.
+        // The bottom inset is large to account for the navigation card overlay.
+        scrollView.contentInset = UIEdgeInsets(top: 40, left: 20, bottom: 320, right: 20)
 
         let container = UIView()
         container.backgroundColor = .clear
         context.coordinator.containerView = container
         scrollView.addSubview(container)
 
-        guard let img = UIImage(named: "astroni_map") else { return scrollView }
-        let imageView = UIImageView(image: img)
-        imageView.contentMode = .scaleAspectFit
-        imageView.isUserInteractionEnabled = false
-        container.addSubview(imageView)
-        context.coordinator.imageView = imageView
+        // Setup the map pieces as requested
+        let pieceNames = [
+            "astroni_map_piece_1",
+            "astroni_map_piece_2",
+            "astroni_map_piece_3",
+            "astroni_map_piece_4",
+            "astroni_map_piece_5",
+            "astroni_map_piece_6"
+        ]
+        
+        var pieceImageViews: [UIImageView] = []
+        var baseImage: UIImage? = nil
+        
+        for name in pieceNames {
+            if let img = UIImage(named: name) {
+                if baseImage == nil {
+                    baseImage = img
+                }
+                let imageView = UIImageView(image: img)
+                imageView.contentMode = .scaleAspectFit
+                imageView.isUserInteractionEnabled = false
+                container.addSubview(imageView)
+                pieceImageViews.append(imageView)
+            }
+        }
+        
+        // Fallback to "astroni_map" if pieces are not yet loaded in Assets.xcassets
+        if pieceImageViews.isEmpty, let fallbackImg = UIImage(named: "astroni_map") {
+            baseImage = fallbackImg
+            let imageView = UIImageView(image: fallbackImg)
+            imageView.contentMode = .scaleAspectFit
+            imageView.isUserInteractionEnabled = false
+            container.addSubview(imageView)
+            pieceImageViews.append(imageView)
+        }
+        
+        // Final fallback if absolutely nothing is loaded (creating dummy map sizing bounds)
+        if baseImage == nil {
+            baseImage = UIImage(systemName: "map")
+        }
+        
+        context.coordinator.pieceImageViews = pieceImageViews
 
-        DispatchQueue.main.async {
-            context.coordinator.setupLayout(in: scrollView, image: img)
+        if let imgToUse = baseImage {
+            DispatchQueue.main.async {
+                context.coordinator.setupLayout(in: scrollView, image: imgToUse)
+            }
         }
 
         return scrollView
@@ -51,6 +94,7 @@ struct VisitorMapView: UIViewRepresentable {
     func updateUIView(_ scrollView: UIScrollView, context: Context) {
         context.coordinator.parent = self
         context.coordinator.refreshMarkers(in: scrollView)
+        context.coordinator.animateToCurrentPosition(in: scrollView)
     }
 
     // MARK: - Coordinator
@@ -58,7 +102,9 @@ struct VisitorMapView: UIViewRepresentable {
     class Coordinator: NSObject, UIScrollViewDelegate {
         var parent: VisitorMapView
         weak var containerView: UIView?
-        weak var imageView: UIImageView?
+        var pieceImageViews: [UIImageView] = []
+        private var hasAnimatedEntrance = false
+        var lastTargetPosition: CGPoint?
         private var userDotLayer: CALayer?
         private var pulseLayer: CALayer?
 
@@ -67,30 +113,73 @@ struct VisitorMapView: UIViewRepresentable {
         }
 
         func setupLayout(in scrollView: UIScrollView, image: UIImage) {
-            guard let container = containerView,
-                  let imageView = imageView else { return }
+            guard let container = containerView else { return }
 
             let screenW = scrollView.bounds.width
             let screenH = scrollView.bounds.height
-            let imgRatio = image.size.height / image.size.width
+            let imageWidth = max(image.size.width, 1.0)
+            let imgRatio = image.size.height / imageWidth
 
             let mapW = screenW
             let mapH = mapW * imgRatio
 
-            imageView.frame = CGRect(x: 0, y: 0, width: mapW, height: mapH)
             container.frame = CGRect(x: 0, y: 0, width: mapW, height: mapH)
+            
+            // Set frame for all map pieces
+            for pieceView in pieceImageViews {
+                pieceView.frame = CGRect(x: 0, y: 0, width: mapW, height: mapH)
+            }
+            
             scrollView.contentSize = CGSize(width: mapW, height: mapH)
 
             let scaleToFitH = screenH / mapH
-            let initialScale = min(1.0, scaleToFitH)
-            scrollView.minimumZoomScale = max(0.3, min(initialScale, 0.8))
-            scrollView.zoomScale = initialScale
+            let scaleToFitW = screenW / mapW
+            let fitScale = min(scaleToFitH, scaleToFitW)
+            
+            scrollView.minimumZoomScale = max(0.3, fitScale)
+            scrollView.maximumZoomScale = 6.0
+            
+            // Set a comfortable initial zoom (e.g. 2x the fit scale, capped at 3.0)
+            let initialZoom = min(max(fitScale * 2.0, 1.5), 3.0)
+            scrollView.zoomScale = initialZoom
 
-            let scaledH = mapH * initialScale
-            let offsetY = max(0, scaledH - screenH)
-            scrollView.setContentOffset(CGPoint(x: 0, y: offsetY), animated: false)
-
+            centerContent(in: scrollView)
             refreshMarkers(in: scrollView)
+            animateToCurrentPosition(in: scrollView, force: true)
+            
+            // Beautiful piece animation!
+            animatePiecesEntrance(screenHeight: screenH)
+        }
+
+        func animatePiecesEntrance(screenHeight: CGFloat) {
+            guard !hasAnimatedEntrance else { return }
+            hasAnimatedEntrance = true
+
+            // Put all pieces up, transparent, scaled up and slightly rotated for a premium physical effect
+            for pieceView in pieceImageViews {
+                pieceView.transform = CGAffineTransform(translationX: 0, y: -screenHeight * 1.2)
+                    .scaledBy(x: 1.15, y: 1.15)
+                    .rotated(by: CGFloat.pi * -0.04) // Slight organic tilt
+                pieceView.alpha = 0.0
+            }
+
+            // Animate each piece down sequentially
+            for (index, pieceView) in pieceImageViews.enumerated() {
+                let delay = Double(index) * 0.45 // Premium staggered delay
+                
+                UIView.animate(
+                    withDuration: 1.4,
+                    delay: delay,
+                    usingSpringWithDamping: 0.72, // Physical soft spring bounce
+                    initialSpringVelocity: 0.2,
+                    options: [.curveEaseOut, .allowUserInteraction],
+                    animations: {
+                        pieceView.transform = .identity
+                        pieceView.alpha = 1.0
+                    },
+                    completion: nil
+                )
+            }
         }
 
         // MARK: UIScrollViewDelegate
@@ -109,30 +198,84 @@ struct VisitorMapView: UIViewRepresentable {
             let boundsSize = scrollView.bounds.size
             var frameToCenter = container.frame
 
-            frameToCenter.origin.x = frameToCenter.size.width < boundsSize.width
-                ? (boundsSize.width - frameToCenter.size.width) / 2 : 0
-            frameToCenter.origin.y = frameToCenter.size.height < boundsSize.height
-                ? (boundsSize.height - frameToCenter.size.height) / 2 : 0
+            let bottomOverlayHeight: CGFloat = 300
+            let visibleHeight = max(0, boundsSize.height - bottomOverlayHeight)
+
+            if frameToCenter.size.width < boundsSize.width {
+                frameToCenter.origin.x = (boundsSize.width - frameToCenter.size.width) / 2
+            } else {
+                frameToCenter.origin.x = 0
+            }
+            
+            if frameToCenter.size.height < visibleHeight {
+                frameToCenter.origin.y = (visibleHeight - frameToCenter.size.height) / 2
+            } else {
+                frameToCenter.origin.y = 0
+            }
+            
             container.frame = frameToCenter
+        }
+
+        func animateToCurrentPosition(in scrollView: UIScrollView, force: Bool = false) {
+            let newPos = parent.currentNormalizedPosition
+            if !force, let lastPos = lastTargetPosition, lastPos == newPos {
+                return
+            }
+            lastTargetPosition = newPos
+            
+            guard let container = containerView else { return }
+            
+            let screenW = scrollView.bounds.width
+            let screenH = scrollView.bounds.height
+            let currentScale = scrollView.zoomScale
+            
+            let mapW = container.bounds.width / currentScale
+            let mapH = container.bounds.height / currentScale
+            
+            let cx = newPos.x * mapW * currentScale
+            let cy = newPos.y * mapH * currentScale
+            
+            let insets = scrollView.contentInset
+            let minOffsetX = -insets.left
+            let minOffsetY = -insets.top
+            let maxOffsetX = max(minOffsetX, mapW * currentScale - screenW + insets.right)
+            let maxOffsetY = max(minOffsetY, mapH * currentScale - screenH + insets.bottom)
+            
+            // Offset the vertical center to account for the bottom navigation panel
+            let visibleCenterY = (screenH - 300) / 2
+            
+            let offsetX = max(minOffsetX, min(cx - screenW / 2, maxOffsetX))
+            let offsetY = max(minOffsetY, min(cy - visibleCenterY, maxOffsetY))
+            
+            let targetOffset = CGPoint(x: offsetX, y: offsetY)
+            
+            if force {
+                scrollView.setContentOffset(targetOffset, animated: false)
+            } else {
+                UIView.animate(withDuration: 1.0, delay: 0, usingSpringWithDamping: 0.8, initialSpringVelocity: 0.2, options: .curveEaseInOut) {
+                    scrollView.setContentOffset(targetOffset, animated: false)
+                }
+            }
         }
 
         // MARK: - Refresh all markers & overlays
 
         func refreshMarkers(in scrollView: UIScrollView) {
-            guard let container = containerView,
-                  let imageView = imageView else { return }
+            guard let container = containerView else { return }
 
-            let imageSize = imageView.frame.size
+            let imageSize = container.bounds.size
             guard imageSize.width > 0, imageSize.height > 0 else { return }
 
             let currentScale = scrollView.zoomScale
 
-            // Remove old overlays (but not the imageView)
+            // Remove old overlays (except for map piece views)
             container.subviews
-                .filter { $0 !== imageView }
+                .filter { subview in !self.pieceImageViews.contains(where: { $0 === subview }) }
                 .forEach { $0.removeFromSuperview() }
             container.layer.sublayers?
-                .filter { $0 !== imageView.layer && $0 !== container.layer }
+                .filter { layer in
+                    layer !== container.layer && !self.pieceImageViews.contains(where: { $0.layer === layer })
+                }
                 .forEach { $0.removeFromSuperlayer() }
 
             // 1. Draw trail path
@@ -161,42 +304,57 @@ struct VisitorMapView: UIViewRepresentable {
         // MARK: - Trail Path
 
         private func drawTrailPath(in container: UIView, imageSize: CGSize) {
-            var points: [CGPoint] = [
-                CGPoint(
-                    x: parent.trail.startX * imageSize.width,
-                    y: parent.trail.startY * imageSize.height
-                )
-            ]
-            points += parent.trail.sortedSteps.compactMap { step in
-                guard let poi = step.poi else { return nil }
-                return CGPoint(x: poi.x * imageSize.width, y: poi.y * imageSize.height)
-            }
-            guard points.count >= 2 else { return }
+            let sortedSteps = parent.trail.sortedSteps
+            guard !sortedSteps.isEmpty else { return }
 
-            for i in 0..<(points.count - 1) {
-                let segmentCompleted: Bool = {
-                    if i == 0 {
-                        return parent.trail.sortedSteps.first?.poi
-                            .map { parent.completedPOIIds.contains($0.id) } ?? false
+            for step in sortedSteps {
+                let isCompleted = parent.completedPOIIds.contains(step.poi?.id ?? UUID())
+                let isNextActive = step.poi?.id == parent.currentStepPOIId
+                
+                // ONLY draw if pathGeometry exists. This forces admins to map trails.
+                guard let geom = step.pathGeometry, !geom.isEmpty else { continue }
+                
+                let coords = PolylineCodec.decode(geom)
+                let path = UIBezierPath()
+                let points = coords.map { CGPoint(x: $0.latitude * imageSize.width, y: $0.longitude * imageSize.height) }
+                
+                if let first = points.first {
+                    path.move(to: first)
+                    for i in 1..<points.count {
+                        path.addLine(to: points[i])
                     }
-                    let fromPOI = parent.trail.sortedSteps[i - 1].poi
-                    return fromPOI.map { parent.completedPOIIds.contains($0.id) } ?? false
-                }()
+                }
 
                 let pathLayer = CAShapeLayer()
-                let path = UIBezierPath()
-                path.move(to: points[i])
-                path.addLine(to: points[i + 1])
                 pathLayer.path = path.cgPath
-                pathLayer.strokeColor = segmentCompleted
-                    ? UIColor.gray.withAlphaComponent(0.45).cgColor
-                    : UIColor(named: "WWFGreen")?.withAlphaComponent(0.75).cgColor
-                        ?? UIColor.green.withAlphaComponent(0.75).cgColor
-                pathLayer.lineWidth = 3
                 pathLayer.fillColor = nil
-                if !segmentCompleted {
-                    pathLayer.lineDashPattern = [8, 4]
+                pathLayer.lineJoin = .round
+                pathLayer.lineCap = .round
+                
+                // Styling
+                if isCompleted {
+                    pathLayer.strokeColor = UIColor.gray.withAlphaComponent(0.3).cgColor
+                    pathLayer.lineWidth = 2
+                    pathLayer.lineDashPattern = nil
+                } else if isNextActive {
+                    // Current segment: Solid, thick, glowing green
+                    let green = UIColor(WWFStyle.Colors.green)
+                    pathLayer.strokeColor = green.cgColor
+                    pathLayer.lineWidth = 6
+                    pathLayer.lineDashPattern = nil
+                    
+                    // Add subtle glow
+                    pathLayer.shadowColor = green.cgColor
+                    pathLayer.shadowRadius = 6
+                    pathLayer.shadowOpacity = 0.8
+                    pathLayer.shadowOffset = .zero
+                } else {
+                    // Future steps: Very faint dotted line
+                    pathLayer.strokeColor = UIColor(WWFStyle.Colors.green).withAlphaComponent(0.15).cgColor
+                    pathLayer.lineWidth = 3
+                    pathLayer.lineDashPattern = [4, 4]
                 }
+                
                 container.layer.addSublayer(pathLayer)
             }
         }
@@ -267,7 +425,7 @@ struct VisitorMapView: UIViewRepresentable {
                 iconName: iconName,
                 zoomScale: zoomScale,
                 isHighlighted: isCurrent,
-                label: nil  // No label on POI markers to keep clean
+                label: nil // Labels omitted on POI markers for a cleaner UI
             )
 
             let totalW = diameter * 2.5
@@ -348,7 +506,7 @@ struct VisitorMapView: UIViewRepresentable {
     }
 }
 
-// MARK: - VisitorMarkerUIView (reusable marker drawn with CoreGraphics)
+// MARK: - VisitorMarkerUIView (Custom CoreGraphics rendering)
 
 final class VisitorMarkerUIView: UIView {
     private let diameter: CGFloat
@@ -438,7 +596,7 @@ final class VisitorMarkerUIView: UIView {
             icon.draw(in: CGRect(origin: iconOrigin, size: iconSize))
         }
 
-        // Label (if provided)
+        // Label rendering
         if let label = label {
             let fontSize: CGFloat = 9 / zoomScale
             let paddingH: CGFloat = 5 / zoomScale

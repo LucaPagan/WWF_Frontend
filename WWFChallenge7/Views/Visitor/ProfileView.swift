@@ -7,8 +7,10 @@
 
 
 import SwiftUI
+import Combine
 
 struct ProfileView: View {
+    @ObservedObject private var localizer = LocalizationManager.shared
     @AppStorage("preferredLanguage") private var language = "it"
     @AppStorage("largeText") private var largeText = false
     @AppStorage("simplifiedMode") private var simplifiedMode = false
@@ -17,36 +19,45 @@ struct ProfileView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Lingua") {
-                    Picker("Lingua app", selection: $language) {
-                        Text("🇮🇹 Italiano").tag("it")
-                        Text("🇬🇧 English").tag("en")
+                Section(localizer.localizedString(for: "language")) {
+                    Picker(localizer.localizedString(for: "language"), selection: Binding(
+                        get: { language },
+                        set: { newValue in
+                            language = newValue
+                            localizer.preferredLanguage = newValue
+                            localizer.objectWillChange.send()
+                        }
+                    )) {
+                        Text("🇮🇹 It").tag("it")
+                        Text("🇬🇧 En").tag("en")
+                        Text("🇩🇪 De").tag("de")
+                        Text("🇫🇷 Fr").tag("fr")
                     }
                     .pickerStyle(.segmented)
                 }
 
-                Section("Accessibilità") {
-                    Toggle("Testo grande", isOn: $largeText)
-                        .tint(Color("WWFGreen"))
-                    Toggle("Modalità semplificata", isOn: $simplifiedMode)
-                        .tint(Color("WWFGreen"))
+                Section(localizer.localizedString(for: "accessibility")) {
+                    Toggle(localizer.localizedString(for: "large_text"), isOn: $largeText)
+                        .tint(WWFStyle.Colors.green)
+                    Toggle(localizer.localizedString(for: "simplified_mode"), isOn: $simplifiedMode)
+                        .tint(WWFStyle.Colors.green)
                 }
 
-                Section("Notifiche") {
-                    Toggle("Aggiornamenti Oasi", isOn: $notifications)
-                        .tint(Color("WWFGreen"))
+                Section(localizer.localizedString(for: "notifications")) {
+                    Toggle(localizer.localizedString(for: "oasis_updates"), isOn: $notifications)
+                        .tint(WWFStyle.Colors.green)
                 }
 
-                Section("Informazioni") {
-                    LabeledContent("Versione", value: "1.0.0")
-                    LabeledContent("Oasi", value: "Astroni · Napoli")
+                Section(localizer.localizedString(for: "info")) {
+                    LabeledContent(localizer.localizedString(for: "version"), value: "1.0.0")
+                    LabeledContent("Oasis", value: localizer.localizedString(for: "oasis_val"))
                     Link(destination: URL(string: "https://www.wwf.it")!) {
-                        Label("Sito WWF Italia", systemImage: "globe")
-                            .foregroundColor(Color("WWFGreen"))
+                        Label(localizer.localizedString(for: "wwf_website"), systemImage: "globe")
+                            .foregroundColor(WWFStyle.Colors.green)
                     }
                 }
             }
-            .navigationTitle("Profilo")
+            .navigationTitle(localizer.localizedString(for: "settings"))
         }
     }
 }

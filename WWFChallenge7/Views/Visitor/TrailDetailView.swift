@@ -12,6 +12,10 @@ struct TrailDetailView: View {
     let trail: Trail
     @Environment(\.dismiss) private var dismiss
     @State private var startTrail = false
+    @State private var showDownloadOptions = false
+    @State private var isManagingPackages = false
+    @EnvironmentObject var downloadManager: DownloadManager
+    @ObservedObject private var localizer = LocalizationManager.shared
 
     var difficulty: TrailDifficulty {
         trail.difficulty ?? .easy
@@ -35,7 +39,7 @@ struct TrailDetailView: View {
                         RoundedRectangle(cornerRadius: 0)
                             .fill(
                                 LinearGradient(
-                                    colors: [Color("WWFGreen"), Color("WWFDarkGreen")],
+                                    colors: [WWFStyle.Colors.green, WWFStyle.Colors.darkGreen],
                                     startPoint: .top,
                                     endPoint: .bottom
                                 )
@@ -43,13 +47,13 @@ struct TrailDetailView: View {
                             .frame(height: 200)
 
                         VStack(alignment: .leading, spacing: 6) {
-                            Text(trail.name)
+                            Text(trail.localizedName)
                                 .font(.largeTitle)
                                 .fontWeight(.bold)
                                 .foregroundColor(.white)
 
                             HStack {
-                                Label(difficulty.rawValue, systemImage: difficulty.icon)
+                                Label(localizer.localizedString(for: "difficulty_" + difficulty.rawValue), systemImage: difficulty.icon)
                                     .foregroundColor(difficultyColor)
                                     .font(.subheadline)
                                     .fontWeight(.semibold)
@@ -66,19 +70,19 @@ struct TrailDetailView: View {
                         .padding()
                     }
 
-                    // Descrizione
+                    // Description
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Descrizione")
+                        Text(localizer.localizedString(for: "description"))
                             .font(.headline)
-                        Text(trail.trailDescription)
+                        Text(trail.localizedDescription)
                             .font(.body)
                             .foregroundColor(.secondary)
                     }
                     .padding(.horizontal)
 
-                    // Tappe del percorso
+                    // Trail Steps
                     VStack(alignment: .leading, spacing: 12) {
-                        Text("Tappe del percorso")
+                        Text(localizer.localizedString(for: "trail_steps"))
                             .font(.headline)
                             .padding(.horizontal)
 
@@ -93,15 +97,15 @@ struct TrailDetailView: View {
                         }
                     }
 
-                    // Avviso modalità offline
+                    // Offline Mode Notice
                     HStack(spacing: 12) {
                         Image(systemName: "wifi.slash")
                             .foregroundColor(.orange)
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Modalità offline")
+                            Text(localizer.localizedString(for: "offline_mode"))
                                 .font(.subheadline)
                                 .fontWeight(.semibold)
-                            Text("La navigazione funziona senza internet. Scansiona i QR code lungo il percorso per aggiornare la tua posizione.")
+                            Text(localizer.localizedString(for: "offline_navigation_desc"))
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }
@@ -112,19 +116,60 @@ struct TrailDetailView: View {
                     .padding(.horizontal)
 
                     // CTA
-                    Button {
-                        startTrail = true
-                    } label: {
-                        Label("Inizia percorso", systemImage: "figure.hiking")
-                            .font(.headline)
-                            .foregroundColor(.white)
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(Color("WWFGreen"))
-                            .clipShape(RoundedRectangle(cornerRadius: 14))
+                    let packages = downloadManager.packages(forTrailId: trail.id)
+                    let isDownloaded = packages.contains(where: { $0.isDownloaded })
+                    
+                    if isDownloaded {
+                        VStack(spacing: 12) {
+                            Button {
+                                isManagingPackages = false
+                                startTrail = true
+                            } label: {
+                                Label(localizer.localizedString(for: "continue_offline"), systemImage: "play.fill")
+                                    .font(.headline)
+                                    .foregroundColor(.white)
+                                    .frame(maxWidth: .infinity)
+                                    .padding()
+                                    .background(WWFStyle.Colors.green)
+                                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                            }
+                            
+                            Button {
+                                isManagingPackages = true
+                                showDownloadOptions = true
+                            } label: {
+                                Label(localizer.localizedString(for: "manage_packages"), systemImage: "arrow.down.circle.fill")
+                                    .font(.subheadline)
+                                    .fontWeight(.semibold)
+                                    .foregroundColor(WWFStyle.Colors.green)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 12)
+                                    .background(WWFStyle.Colors.green.opacity(0.1))
+                                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 14)
+                                            .stroke(WWFStyle.Colors.green, lineWidth: 1)
+                                    )
+                            }
+                        }
+                        .padding(.horizontal)
+                        .padding(.bottom, 32)
+                    } else {
+                        Button {
+                            isManagingPackages = false
+                            showDownloadOptions = true
+                        } label: {
+                            Label(localizer.localizedString(for: "download_and_start"), systemImage: "icloud.and.arrow.down.fill")
+                                .font(.headline)
+                                .foregroundColor(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding()
+                                .background(WWFStyle.Colors.green)
+                                .clipShape(RoundedRectangle(cornerRadius: 14))
+                        }
+                        .padding(.horizontal)
+                        .padding(.bottom, 32)
                     }
-                    .padding(.horizontal)
-                    .padding(.bottom, 32)
                 }
             }
             .ignoresSafeArea(edges: .top)
@@ -141,6 +186,14 @@ struct TrailDetailView: View {
             }
             .fullScreenCover(isPresented: $startTrail) {
                 ActiveTrailView(trail: trail)
+            }
+            .sheet(isPresented: $showDownloadOptions) {
+                DownloadSelectionView(trail: trail)
+                    .onDisappear {
+                        if !isManagingPackages {
+                            startTrail = true
+                        }
+                    }
             }
         }
     }
@@ -159,7 +212,7 @@ struct TrailStepRowView: View {
             VStack(spacing: 0) {
                 ZStack {
                     Circle()
-                        .fill(Color("WWFGreen"))
+                        .fill(WWFStyle.Colors.green)
                         .frame(width: 30, height: 30)
                     Text("\(index + 1)")
                         .font(.caption)
@@ -168,14 +221,14 @@ struct TrailStepRowView: View {
                 }
                 if !isLast {
                     Rectangle()
-                        .fill(Color("WWFGreen").opacity(0.3))
+                        .fill(WWFStyle.Colors.green.opacity(0.3))
                         .frame(width: 2, height: 40)
                 }
             }
 
             VStack(alignment: .leading, spacing: 4) {
                 if let poi = step.poi {
-                    Text(poi.name)
+                    Text(poi.localizedName)
                         .font(.subheadline)
                         .fontWeight(.semibold)
                 }

@@ -1,6 +1,6 @@
 //
 //  TrailStep.swift
-//  GestionaleWWFIpad
+//  WWFChallenge7
 //
 //  Mirrors Supabase table: public.path_steps
 //  SRS Reference: Chapter 11 — Table: path_steps
@@ -8,13 +8,14 @@
 
 import Foundation
 import SwiftData
+import CoreLocation
 
 // MARK: - TrailStep Model
 
 /// A single step in a trail: links a POI in sequence with navigation hints.
 /// Mirrors the `path_steps` table on Supabase.
 @Model
-final class TrailStep {
+final class TrailStep: @unchecked Sendable {
     // MARK: - Primary Key
     var id: UUID
 
@@ -23,6 +24,7 @@ final class TrailStep {
     var directionHint: String?             // DB: direction_hint — navigation instructions
     var distanceMeters: Int?               // DB: distance_meters (CHECK > 0)
     var estimatedMinutes: Int?             // DB: estimated_minutes (CHECK > 0)
+    var pathGeometry: String?              // DB: path_geometry — encoded polyline for path tracing
 
     // MARK: - Relationships
     var poi: POI?                          // DB: poi_id (FK → pois)
@@ -37,6 +39,7 @@ final class TrailStep {
         directionHint: String? = nil,
         distanceMeters: Int? = nil,
         estimatedMinutes: Int? = nil,
+        pathGeometry: String? = nil,
         poi: POI? = nil,
         fixedID: UUID? = nil
     ) {
@@ -45,17 +48,29 @@ final class TrailStep {
         self.directionHint = directionHint
         self.distanceMeters = distanceMeters
         self.estimatedMinutes = estimatedMinutes
+        self.pathGeometry = pathGeometry
         self.poi = poi
         self.createdAt = Date()
+    }
+
+    // MARK: - Helpers
+
+    /// Decodes the path geometry into a list of coordinates for MapKit.
+    var coordinates: [CLLocationCoordinate2D] {
+        guard let pathGeometry = pathGeometry else { return [] }
+        return PolylineCodec.decode(pathGeometry)
     }
 
     // MARK: - Backward Compatibility
 
     /// Alias for directionHint — used by existing views that reference `instructions`
     var instructions: String {
-        get { directionHint ?? "" }
+        get {
+            LocalizationManager.shared.localizedField(table: "path_steps", recordId: id, fieldName: "direction_hint", fallback: directionHint ?? "")
+        }
         set { directionHint = newValue }
     }
+
 
     /// Alias for stepOrder — used by existing views that reference `orderIndex`
     var orderIndex: Int {

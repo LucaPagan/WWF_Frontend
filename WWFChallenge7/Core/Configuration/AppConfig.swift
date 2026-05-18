@@ -1,6 +1,6 @@
 //
 //  AppConfig.swift
-//  GestionaleWWFIpad
+//  WWFChallenge7
 //
 
 import Foundation

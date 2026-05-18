@@ -1,5 +1,15 @@
+//
+//  WWFChallenge7App.swift
+//  WWFChallenge7
+//
+//  App entry point — Clean Architecture aligned.
+//  Initialises SwiftData with all entities, injects SyncManager,
+//  DownloadManager, and UserSession into the environment.
+//
+
 import SwiftUI
 import SwiftData
+import Combine
 
 @main
 struct WWFChallenge7App: App {
@@ -7,8 +17,16 @@ struct WWFChallenge7App: App {
 
     init() {
         do {
-            // Configurazione con migrazione automatica abilitata
-            let schema = Schema([Trail.self, POI.self, TrailStep.self, Event.self])
+            let schema = Schema([
+                Trail.self,
+                POI.self,
+                TrailStep.self,
+                Event.self,
+                Content.self,
+                DownloadPackage.self,
+                UserProfile.self,
+                LocalTranslation.self
+            ])
             let config = ModelConfiguration(
                 schema: schema,
                 isStoredInMemoryOnly: false,
@@ -16,11 +34,19 @@ struct WWFChallenge7App: App {
             )
             container = try ModelContainer(for: schema, configurations: config)
         } catch {
-            // Se la migrazione fallisce, cancella lo store e riparte pulito
-            // Questo elimina tutti i dati salvati — ok per prototipo
+            // If migration fails, delete the store and restart clean
             Self.deleteStore()
             do {
-                let schema = Schema([Trail.self, POI.self, TrailStep.self, Event.self])
+                let schema = Schema([
+                    Trail.self,
+                    POI.self,
+                    TrailStep.self,
+                    Event.self,
+                    Content.self,
+                    DownloadPackage.self,
+                    UserProfile.self,
+                    LocalTranslation.self
+                ])
                 let config = ModelConfiguration(schema: schema)
                 container = try ModelContainer(for: schema, configurations: config)
             } catch {
@@ -30,20 +56,39 @@ struct WWFChallenge7App: App {
     }
 
     @StateObject private var syncManager = SyncManager()
+    @StateObject private var downloadManager = DownloadManager()
+    @StateObject private var userSession = UserSession()
 
     var body: some Scene {
         WindowGroup {
             VisitorRootView()
                 .modelContainer(container)
                 .environmentObject(syncManager)
+                .environmentObject(downloadManager)
+                .environmentObject(userSession)
                 .task {
+                    // 1. Configure managers with model context
                     syncManager.configure(with: container.mainContext)
+                    downloadManager.configure(with: container.mainContext)
+                    LocalizationManager.shared.configure(with: container)
+
+                    // 2. Ensure anonymous profile exists
+                    await userSession.ensureAnonymousProfile()
+
+                    // 3. Restore any existing auth session
+                    await userSession.restoreSession()
+
+                    // 4. Seed data if needed (first launch / empty store)
+                    DataService.seedIfNeeded(context: container.mainContext)
+
+                    // 5. Pull latest data from Supabase
                     await syncManager.pullLatestData()
                 }
         }
     }
 
-    // Cancella il file .store dal disco
+    // MARK: - Store Reset
+
     private static func deleteStore() {
         let urls = FileManager.default
             .urls(for: .applicationSupportDirectory, in: .userDomainMask)

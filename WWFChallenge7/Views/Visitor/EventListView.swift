@@ -14,6 +14,7 @@ struct EventListView: View {
     private var events: [Event]
 
     @State private var selectedEvent: Event? = nil
+    @ObservedObject private var localizer = LocalizationManager.shared
 
     var body: some View {
         NavigationStack {
@@ -23,14 +24,14 @@ struct EventListView: View {
                     // Header
                     EventsHeaderView()
 
-                    // Eventi di oggi
+                    // Today's Events
                     let todayEvents = events.filter { $0.isToday }
                     if !todayEvents.isEmpty {
                         VStack(alignment: .leading, spacing: 12) {
                             HStack(spacing: 8) {
                                 Image(systemName: "sparkles")
                                     .foregroundColor(.orange)
-                                Text("Oggi all'Oasi")
+                                Text(localizer.localizedString(for: "today_oasis"))
                                     .font(.title2)
                                     .fontWeight(.bold)
                             }
@@ -44,23 +45,23 @@ struct EventListView: View {
                         }
                     }
 
-                    // Prossimi eventi
+                    // Upcoming Events
                     let upcoming = events.filter { $0.isUpcoming && !$0.isToday }
                     VStack(alignment: .leading, spacing: 12) {
-                        Text("Prossimi eventi")
+                        Text(localizer.localizedString(for: "upcoming_events"))
                             .font(.title2)
                             .fontWeight(.bold)
                             .padding(.horizontal)
 
                         if upcoming.isEmpty && todayEvents.isEmpty {
                             ContentUnavailableView(
-                                "Nessun evento in programma",
+                                localizer.localizedString(for: "no_events_scheduled"),
                                 systemImage: "calendar",
-                                description: Text("Torna a trovarci presto per scoprire le attività dell'Oasi!")
+                                description: Text(localizer.localizedString(for: "no_events_scheduled_desc"))
                             )
                             .padding(.top, 40)
                         } else if upcoming.isEmpty {
-                            Text("Nessun altro evento in programma al momento.")
+                            Text(localizer.localizedString(for: "no_other_events"))
                                 .font(.subheadline)
                                 .foregroundColor(.secondary)
                                 .padding(.horizontal)
@@ -77,7 +78,7 @@ struct EventListView: View {
                 }
                 .padding(.top)
             }
-            .navigationTitle("Eventi")
+            .navigationTitle(localizer.localizedString(for: "events"))
             .navigationBarTitleDisplayMode(.large)
             .fullScreenCover(item: $selectedEvent) { event in
                 EventDetailView(event: event)
@@ -89,6 +90,8 @@ struct EventListView: View {
 // MARK: - Events Header
 
 struct EventsHeaderView: View {
+    @ObservedObject private var localizer = LocalizationManager.shared
+
     var body: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 16)
@@ -105,10 +108,10 @@ struct EventsHeaderView: View {
                 Image(systemName: "calendar.badge.clock")
                     .font(.system(size: 36))
                     .foregroundColor(.white.opacity(0.9))
-                Text("Eventi e Attività")
+                Text(localizer.localizedString(for: "events_activities"))
                     .font(.headline)
                     .foregroundColor(.white)
-                Text("Scopri le esperienze organizzate nell'Oasi degli Astroni")
+                Text(localizer.localizedString(for: "events_oasis_desc"))
                     .font(.caption)
                     .foregroundColor(.white.opacity(0.8))
                     .multilineTextAlignment(.center)
@@ -124,6 +127,7 @@ struct EventsHeaderView: View {
 struct EventCardView: View {
     let event: Event
     let isHighlighted: Bool
+    @ObservedObject private var localizer = LocalizationManager.shared
 
     var categoryColor: Color {
         event.category.color
@@ -131,13 +135,13 @@ struct EventCardView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            // Top: categoria + data
+            // Top: category + data
             HStack {
-                // Badge categoria
+                // Category Badge
                 HStack(spacing: 4) {
                     Image(systemName: event.category.icon)
                         .font(.caption2)
-                    Text(event.category.rawValue)
+                    Text(localizer.localizedString(for: "event_cat_" + event.category.rawValue))
                         .font(.caption2)
                         .fontWeight(.semibold)
                 }
@@ -150,7 +154,7 @@ struct EventCardView: View {
                 Spacer()
 
                 if event.isToday {
-                    Text("OGGI")
+                    Text(localizer.localizedString(for: "today_upper"))
                         .font(.caption2)
                         .fontWeight(.black)
                         .foregroundColor(.white)
@@ -161,14 +165,14 @@ struct EventCardView: View {
                 }
             }
 
-            // Titolo e descrizione
+            // Title and description
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(event.name)
+                    Text(event.localizedName)
                         .font(.headline)
                         .foregroundColor(.primary)
 
-                    Text(event.eventDescription)
+                    Text(event.localizedDescription)
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                         .lineLimit(2)
@@ -189,31 +193,31 @@ struct EventCardView: View {
                     .foregroundColor(.secondary)
 
                 if event.price > 0 {
-                    Label(String(format: "%.2f €", event.price), systemImage: "eurosign.circle")
+                    Label(String(format: "€ %.2f", event.price), systemImage: "eurosign.circle")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 } else {
-                    Label("Gratuito", systemImage: "eurosign.circle")
+                    Label(localizer.localizedString(for: "free_price"), systemImage: "eurosign.circle")
                         .font(.caption)
                         .foregroundColor(.green)
                         .fontWeight(.semibold)
                 }
             }
 
-            // Percorso associato
+            // Associated trail
             if let trail = event.trail {
                 HStack(spacing: 6) {
                     Image(systemName: "signpost.right.and.left.fill")
                         .font(.caption2)
-                        .foregroundColor(Color("WWFGreen"))
-                    Text("Percorso: \(trail.name)")
+                        .foregroundColor(WWFStyle.Colors.green)
+                    Text("\(localizer.localizedString(for: "associated_trail")): \(trail.localizedName)")
                         .font(.caption)
-                        .foregroundColor(Color("WWFGreen"))
+                        .foregroundColor(WWFStyle.Colors.green)
                         .fontWeight(.medium)
                 }
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
-                .background(Color("WWFGreen").opacity(0.08))
+                .background(WWFStyle.Colors.green.opacity(0.08))
                 .clipShape(Capsule())
             }
         }

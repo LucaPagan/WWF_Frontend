@@ -1,6 +1,9 @@
 //
 //  Event.swift
-//  GestionaleWWFIpad
+//  WWFChallenge7
+//
+//  SwiftData entity — mirrors Supabase table: public.events
+//  Identical schema to GestionaleWWFIpad/Domain/Entities/Event.swift
 //
 
 import Foundation
@@ -8,7 +11,7 @@ import SwiftData
 import SwiftUI
 
 @Model
-final class Event {
+final class Event: @unchecked Sendable {
     var id: UUID
     var name: String
     var eventDescription: String
@@ -41,6 +44,19 @@ final class Event {
     @Transient var targetAudience: EventAudience {
         get { EventAudience(rawValue: targetAudienceRawValue) ?? .all }
         set { targetAudienceRawValue = newValue.rawValue }
+    }
+
+    @Transient var localizedName: String {
+        LocalizationManager.shared.localizedField(table: "events", recordId: id, fieldName: "name", fallback: name)
+    }
+
+    @Transient var localizedDescription: String {
+        LocalizationManager.shared.localizedField(table: "events", recordId: id, fieldName: "description", fallback: eventDescription)
+    }
+
+    @Transient var localizedRequirements: String? {
+        guard let req = requirements, !req.isEmpty else { return nil }
+        return LocalizationManager.shared.localizedField(table: "events", recordId: id, fieldName: "requirements", fallback: req)
     }
 
     init(
@@ -132,36 +148,6 @@ final class Event {
     }
 }
 
-extension Event {
-    func toSupabaseParams() -> [String: Any?] {
-        let dateFmt = DateFormatter()
-        dateFmt.dateFormat = "yyyy-MM-dd"
-
-        let timeFmt = DateFormatter()
-        timeFmt.dateFormat = "HH:mm"
-
-        return [
-            "p_id": id.uuidString,
-            "p_name": name,
-            "p_description": eventDescription,
-            "p_category": categoryRawValue,
-            "p_date": dateFmt.string(from: date),
-            "p_time_start": timeFmt.string(from: timeStart),
-            "p_time_end": timeFmt.string(from: timeEnd),
-            "p_max_participants": maxParticipants,
-            "p_contact_info": contactInfo,
-            "p_requirements": requirements,
-            "p_target_audience": targetAudienceRawValue,
-            "p_price": price,
-            "p_image_url": imageURL,
-            "p_is_active": isActive,
-            "p_path_id": trail?.id.uuidString,
-            "p_event_poi_id": eventPOI?.id.uuidString,
-            "p_organizer_name": organizerName
-        ]
-    }
-}
-
 enum EventCategory: String, Codable, CaseIterable {
     case educational  = "educational"
     case guidedTour   = "guided_tour"
@@ -197,19 +183,19 @@ enum EventCategory: String, Codable, CaseIterable {
 
     var color: Color {
         switch self {
-        case .educational:  return .blue
-        case .guidedTour:   return .green
-        case .workshop:     return .orange
-        case .family:       return .purple
-        case .photography:  return .mint
-        case .scientific:   return .indigo
-        case .other:        return .gray
+        case .educational:  return WWFStyle.Colors.educational
+        case .guidedTour:   return WWFStyle.Colors.green
+        case .workshop:     return WWFStyle.Colors.workshop
+        case .family:       return WWFStyle.Colors.family
+        case .photography:  return WWFStyle.Colors.photography
+        case .scientific:   return WWFStyle.Colors.scientific
+        case .other:        return WWFStyle.Colors.other
         }
     }
 
     var supabaseValue: String { rawValue }
 
-    static func fromSupabase(_ value: String) -> EventCategory? {
+    nonisolated static func fromSupabase(_ value: String) -> EventCategory? {
         EventCategory(rawValue: value)
     }
 }
@@ -235,7 +221,7 @@ enum EventAudience: String, Codable, CaseIterable {
 
     var supabaseValue: String { rawValue }
 
-    static func fromSupabase(_ value: String) -> EventAudience? {
+    nonisolated static func fromSupabase(_ value: String) -> EventAudience? {
         EventAudience(rawValue: value)
     }
 }

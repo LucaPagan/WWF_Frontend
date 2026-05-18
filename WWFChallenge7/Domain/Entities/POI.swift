@@ -1,6 +1,9 @@
 //
 //  POI.swift
-//  GestionaleWWFIpad
+//  WWFChallenge7
+//
+//  SwiftData entity — mirrors Supabase table: public.pois
+//  Identical schema to GestionaleWWFIpad/Domain/Entities/POI.swift
 //
 
 import Foundation
@@ -8,7 +11,7 @@ import SwiftData
 import SwiftUI
 
 @Model
-final class POI {
+final class POI: @unchecked Sendable {
     var id: UUID
     var name: String
     var poiDescription: String
@@ -30,6 +33,15 @@ final class POI {
         get { POIType(rawValue: typeRawValue) ?? .landmark }
         set { typeRawValue = newValue.rawValue }
     }
+
+    @Transient var localizedName: String {
+        LocalizationManager.shared.localizedField(table: "pois", recordId: id, fieldName: "name", fallback: name)
+    }
+
+    @Transient var localizedDescription: String {
+        LocalizationManager.shared.localizedField(table: "pois", recordId: id, fieldName: "poi_description", fallback: poiDescription)
+    }
+
 
     init(
         name: String,
@@ -72,30 +84,11 @@ final class POI {
         latitude = data["latitude"] as? Double
         longitude = data["longitude"] as? Double
         if let t = data["type"] as? String { typeRawValue = t }
-        photoURL = data["photo_data"] as? String
+        photoURL = data["photo_url"] as? String
         if let qr = data["qr_payload"] as? String { qrPayload = qr }
         if let sp = data["is_start_point"] as? Bool { isStartPoint = sp }
         if let active = data["is_active"] as? Bool { isActive = active }
         needsSync = false
-    }
-}
-
-extension POI {
-    func toSupabaseParams() -> [String: Any?] {
-        return [
-            "p_id": id.uuidString,
-            "p_name": name,
-            "p_description": poiDescription,
-            "p_x": x,
-            "p_y": y,
-            "p_latitude": latitude,
-            "p_longitude": longitude,
-            "p_type": typeRawValue,
-            "p_photo_url": photoURL,
-            "p_qr_payload": qrPayload,
-            "p_is_start_point": isStartPoint,
-            "p_is_active": isActive
-        ]
     }
 }
 
@@ -128,17 +121,17 @@ enum POIType: String, Codable, CaseIterable {
 
     var color: Color {
         switch self {
-        case .landmark:   return .green
-        case .info:       return .blue
-        case .warning:    return .orange
-        case .danger:     return .red
-        case .startPoint: return .purple
+        case .landmark:   return WWFStyle.Colors.green
+        case .info:       return WWFStyle.Colors.info
+        case .warning:    return WWFStyle.Colors.warning
+        case .danger:     return WWFStyle.Colors.danger
+        case .startPoint: return WWFStyle.Colors.purple
         }
     }
 
     var supabaseValue: String { rawValue }
 
-    static func fromSupabase(_ value: String) -> POIType? {
+    nonisolated static func fromSupabase(_ value: String) -> POIType? {
         POIType(rawValue: value)
     }
 }

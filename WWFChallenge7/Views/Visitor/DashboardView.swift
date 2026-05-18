@@ -14,6 +14,7 @@ struct DashboardView: View {
     private var trails: [Trail]
 
     @State private var selectedTrail: Trail? = nil
+    @ObservedObject private var localizer = LocalizationManager.shared
 
     var body: some View {
         NavigationStack {
@@ -28,16 +29,16 @@ struct DashboardView: View {
 
                     // Percorsi disponibili
                     VStack(alignment: .leading, spacing: 12) {
-                        Text("Percorsi disponibili")
+                        Text(localizer.localizedString(for: "active_trails"))
                             .font(.title2)
                             .fontWeight(.bold)
                             .padding(.horizontal)
 
                         if trails.isEmpty {
                             ContentUnavailableView(
-                                "Nessun percorso disponibile",
+                                localizer.localizedString(for: "no_active_trails"),
                                 systemImage: "map",
-                                description: Text("I gestori dell'Oasi non hanno ancora pubblicato percorsi.")
+                                description: Text(localizer.localizedString(for: "no_active_trails_desc"))
                             )
                             .padding(.top, 40)
                         } else {
@@ -55,7 +56,7 @@ struct DashboardView: View {
                 }
                 .padding(.top)
             }
-            .navigationTitle("Oasi degli Astroni")
+            .navigationTitle(localizer.localizedString(for: "app_title"))
             .navigationBarTitleDisplayMode(.large)
             .fullScreenCover(item: $selectedTrail) { trail in
                 TrailDetailView(trail: trail)
@@ -67,6 +68,8 @@ struct DashboardView: View {
 // MARK: - Header
 
 struct OasiHeaderView: View {
+    @ObservedObject private var localizer = LocalizationManager.shared
+    
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             // Immagine di copertina placeholder
@@ -74,7 +77,7 @@ struct OasiHeaderView: View {
                 RoundedRectangle(cornerRadius: 16)
                     .fill(
                         LinearGradient(
-                            colors: [Color("WWFGreen").opacity(0.8), Color("WWFDarkGreen")],
+                            colors: [WWFStyle.Colors.green.opacity(0.8), WWFStyle.Colors.darkGreen],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         )
@@ -85,10 +88,10 @@ struct OasiHeaderView: View {
                     Image(systemName: "leaf.circle.fill")
                         .font(.system(size: 48))
                         .foregroundColor(.white.opacity(0.9))
-                    Text("Benvenuto nell'Oasi")
+                    Text(localizer.localizedString(for: "welcome"))
                         .font(.headline)
                         .foregroundColor(.white)
-                    Text("Riserva Naturale degli Astroni · Napoli")
+                    Text(localizer.localizedString(for: "oasis_val"))
                         .font(.caption)
                         .foregroundColor(.white.opacity(0.8))
                 }
@@ -101,13 +104,15 @@ struct OasiHeaderView: View {
 // MARK: - Quick Info Banner
 
 struct QuickInfoBanner: View {
+    @ObservedObject private var localizer = LocalizationManager.shared
+
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 12) {
                 QuickInfoChip(icon: "clock.fill", text: "9:00 – 17:00", color: .blue)
-                QuickInfoChip(icon: "eurosign.circle.fill", text: "Ingresso libero", color: .green)
-                QuickInfoChip(icon: "wifi.slash", text: "Offline ready", color: .orange)
-                QuickInfoChip(icon: "qrcode.viewfinder", text: "QR richiesti", color: .purple)
+                QuickInfoChip(icon: "eurosign.circle.fill", text: localizer.localizedString(for: "free_entrance"), color: .green)
+                QuickInfoChip(icon: "wifi.slash", text: localizer.localizedString(for: "offline_ready"), color: .orange)
+                QuickInfoChip(icon: "qrcode.viewfinder", text: localizer.localizedString(for: "qr_required"), color: .purple)
             }
             .padding(.horizontal)
         }
@@ -142,6 +147,7 @@ struct QuickInfoChip: View {
 
 struct TrailCardView: View {
     let trail: Trail
+    @ObservedObject private var localizer = LocalizationManager.shared
 
     var difficulty: TrailDifficulty {
         trail.difficulty ?? .easy
@@ -159,11 +165,11 @@ struct TrailCardView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(trail.name)
+                    Text(trail.localizedName)
                         .font(.headline)
                         .foregroundColor(.primary)
 
-                    Text(trail.trailDescription)
+                    Text(trail.localizedDescription)
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                         .lineLimit(2)
@@ -175,7 +181,7 @@ struct TrailCardView: View {
 
             HStack(spacing: 16) {
                 // Difficoltà
-                Label(difficulty.rawValue, systemImage: difficulty.icon)
+                Label(localizer.localizedString(for: "difficulty_" + difficulty.rawValue), systemImage: difficulty.icon)
                     .font(.caption)
                     .fontWeight(.semibold)
                     .foregroundColor(difficultyColor)
@@ -186,7 +192,7 @@ struct TrailCardView: View {
                     .foregroundColor(.secondary)
 
                 // N° tappe
-                Label("\(trail.steps.count) tappe", systemImage: "mappin.and.ellipse")
+                Label("\(trail.steps.count) \(localizer.localizedString(for: "steps_label"))", systemImage: "mappin.and.ellipse")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }

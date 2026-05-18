@@ -26,7 +26,7 @@ final class QRScannerViewController: UIViewController, AVCaptureMetadataOutputOb
 
     private var captureSession: AVCaptureSession?
     private var previewLayer: AVCaptureVideoPreviewLayer?
-    private var hasScanned = false   
+    private var hasScanned = false
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -37,7 +37,7 @@ final class QRScannerViewController: UIViewController, AVCaptureMetadataOutputOb
 
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
-        // Reset del flag ogni volta che lo scanner viene mostrato
+        // Reset flag whenever the scanner is shown
         hasScanned = false
         if captureSession?.isRunning == false {
             DispatchQueue.global(qos: .userInitiated).async { [weak self] in
@@ -76,7 +76,7 @@ final class QRScannerViewController: UIViewController, AVCaptureMetadataOutputOb
     }
 
     private func addOverlay() {
-        // Mirino centrale
+        // Central viewfinder
         let overlay = UIView()
         overlay.translatesAutoresizingMaskIntoConstraints = false
         overlay.layer.borderColor = UIColor.white.cgColor
@@ -93,9 +93,9 @@ final class QRScannerViewController: UIViewController, AVCaptureMetadataOutputOb
         ])
 
         let label = UILabel()
-        label.text = "Inquadra il QR code"
+        label.text = LocalizationManager.shared.localizedString(for: "scan_qr_prompt")
         label.textColor = .white
-        label.font = .systemFont(ofSize: 14)
+        label.font = .systemFont(ofSize: 14, weight: .medium)
         label.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(label)
         NSLayoutConstraint.activate([

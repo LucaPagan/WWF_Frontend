@@ -8,9 +8,9 @@
 
 import SwiftUI
 
-// MARK: - Mappa placeholder
-// Sostituire MapPlaceholderView() con Image("astroni_map")
-// quando l'asset è pronto
+// MARK: - Map Placeholder
+// Replace MapPlaceholderView() with Image("astroni_map")
+// once the asset is ready
 
 struct MapPlaceholderView: View {
     var body: some View {
@@ -21,7 +21,7 @@ struct MapPlaceholderView: View {
     }
 }
 
-// MARK: - Linea percorso sulla mappa
+// MARK: - Trail Path Overlay on Map
 
 struct TrailPathOverlay: View {
     let trail: Trail
@@ -45,7 +45,7 @@ struct TrailPathOverlay: View {
                 path.move(to: points[i])
                 path.addLine(to: points[i + 1])
 
-                // Il tratto è grigio se il segmento è già percorso
+                // The path segment is gray if it has already been traversed
                 let segmentCompleted: Bool = {
                     guard i > 0 else {
                         return trail.sortedSteps.first?.poi
@@ -60,7 +60,7 @@ struct TrailPathOverlay: View {
                     with: .color(
                         segmentCompleted
                             ? Color.gray.opacity(0.45)
-                            : Color("WWFGreen").opacity(0.75)
+                            : WWFStyle.Colors.green.opacity(0.75)
                     ),
                     style: StrokeStyle(
                         lineWidth: 3,
@@ -72,7 +72,7 @@ struct TrailPathOverlay: View {
     }
 }
 
-// MARK: - Marker POI visitatore
+// MARK: - Visitor POI Marker
 
 struct POIMarkerView: View {
     let poi: POI
@@ -90,7 +90,7 @@ struct POIMarkerView: View {
                 .fill(
                     isCompleted ? Color.gray
                     : isCurrent ? Color.yellow
-                    : Color("WWFGreen")
+                    : WWFStyle.Colors.green
                 )
                 .frame(width: 28, height: 28)
                 .overlay(
@@ -104,7 +104,7 @@ struct POIMarkerView: View {
     }
 }
 
-// MARK: - Barra progresso
+// MARK: - Progress Bar
 
 struct ProgressBar: View {
     let fraction: Double
@@ -115,7 +115,7 @@ struct ProgressBar: View {
                 Rectangle()
                     .fill(Color.gray.opacity(0.2))
                 Rectangle()
-                    .fill(Color("WWFGreen"))
+                    .fill(WWFStyle.Colors.green)
                     .frame(width: geo.size.width * fraction)
                     .animation(.spring(), value: fraction)
             }
@@ -123,7 +123,7 @@ struct ProgressBar: View {
     }
 }
 
-// MARK: - Banner completamento percorso
+// MARK: - Trail Completion Banner
 
 struct CompletedBanner: View {
     var body: some View {
@@ -132,9 +132,9 @@ struct CompletedBanner: View {
                 .foregroundColor(.green)
                 .font(.title2)
             VStack(alignment: .leading) {
-                Text("Percorso completato!")
+                Text(LocalizationManager.shared.localizedString(for: "trail_completed"))
                     .fontWeight(.bold)
-                Text("Hai visitato tutte le tappe dell'Oasi.")
+                Text(LocalizationManager.shared.localizedString(for: "great_job"))
                     .font(.caption)
                     .foregroundColor(.secondary)
             }

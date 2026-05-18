@@ -11,6 +11,7 @@ struct EventDetailView: View {
     let event: Event
     @Environment(\.dismiss) private var dismiss
     @State private var startTrail = false
+    @ObservedObject private var localizer = LocalizationManager.shared
 
     var categoryColor: Color {
         event.category.color
@@ -38,7 +39,7 @@ struct EventDetailView: View {
                             HStack(spacing: 6) {
                                 Image(systemName: event.category.icon)
                                     .font(.caption)
-                                Text(event.category.rawValue)
+                                Text(localizer.localizedString(for: "event_cat_" + event.category.rawValue))
                                     .font(.caption)
                                     .fontWeight(.semibold)
                             }
@@ -48,7 +49,7 @@ struct EventDetailView: View {
                             .background(Color.white.opacity(0.2))
                             .clipShape(Capsule())
 
-                            Text(event.name)
+                            Text(event.localizedName)
                                 .font(.largeTitle)
                                 .fontWeight(.bold)
                                 .foregroundColor(.white)
@@ -68,15 +69,15 @@ struct EventDetailView: View {
                     // MARK: Info rapide
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 10) {
-                            EventInfoChip(icon: "person.2.fill", text: "Max \(event.maxParticipants)", color: .blue)
+                            EventInfoChip(icon: "person.2.fill", text: "\(localizer.localizedString(for: "max_label")) \(event.maxParticipants ?? 30)", color: .blue)
                             if event.price > 0 {
                                 EventInfoChip(icon: "eurosign.circle.fill", text: String(format: "%.2f €", event.price), color: .orange)
                             } else {
-                                EventInfoChip(icon: "eurosign.circle.fill", text: "Gratuito", color: .green)
+                                EventInfoChip(icon: "eurosign.circle.fill", text: localizer.localizedString(for: "free_price"), color: .green)
                             }
-                            EventInfoChip(icon: "person.crop.circle.fill", text: event.targetAudience.rawValue, color: .purple)
+                            EventInfoChip(icon: "person.crop.circle.fill", text: localizer.localizedString(for: "audience_" + event.targetAudience.rawValue), color: .purple)
                             if let poi = event.eventPOI {
-                                EventInfoChip(icon: poi.type.icon, text: poi.name, color: poi.type.color)
+                                EventInfoChip(icon: poi.type.icon, text: poi.localizedName, color: poi.type.color)
                             }
                         }
                         .padding(.horizontal)
@@ -84,9 +85,9 @@ struct EventDetailView: View {
 
                     // MARK: Descrizione
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Descrizione")
+                        Text(localizer.localizedString(for: "description"))
                             .font(.headline)
-                        Text(event.eventDescription)
+                        Text(event.localizedDescription)
                             .font(.body)
                             .foregroundColor(.secondary)
                     }
@@ -95,7 +96,7 @@ struct EventDetailView: View {
                     // MARK: Organizzazione
                     if !(event.organizerName?.isEmpty ?? true) || !(event.contactInfo?.isEmpty ?? true) {
                         VStack(alignment: .leading, spacing: 10) {
-                            Text("Organizzazione")
+                            Text(localizer.localizedString(for: "organization"))
                                 .font(.headline)
                             if let organizer = event.organizerName, !organizer.isEmpty {
                                 HStack(spacing: 10) {
@@ -119,9 +120,9 @@ struct EventDetailView: View {
                     }
 
                     // MARK: Requisiti
-                    if let reqs = event.requirements, !reqs.isEmpty {
+                    if let reqs = event.localizedRequirements, !reqs.isEmpty {
                         VStack(alignment: .leading, spacing: 8) {
-                            Text("Cosa portare")
+                            Text(localizer.localizedString(for: "what_to_bring"))
                                 .font(.headline)
                             HStack(alignment: .top, spacing: 10) {
                                 Image(systemName: "backpack.fill")
@@ -140,7 +141,7 @@ struct EventDetailView: View {
                     // MARK: Percorso associato
                     if let trail = event.trail {
                         VStack(alignment: .leading, spacing: 12) {
-                            Text("Come raggiungerci")
+                            Text(localizer.localizedString(for: "how_to_reach_us"))
                                 .font(.headline)
                                 .padding(.horizontal)
 
@@ -154,10 +155,10 @@ struct EventDetailView: View {
                         Image(systemName: "wifi.slash")
                             .foregroundColor(.orange)
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Modalità offline")
+                            Text(localizer.localizedString(for: "offline_mode"))
                                 .font(.subheadline)
                                 .fontWeight(.semibold)
-                            Text("La navigazione verso l'evento funziona senza internet. Segui il percorso e scansiona i QR code.")
+                            Text(localizer.localizedString(for: "offline_trail_desc"))
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }
@@ -172,12 +173,12 @@ struct EventDetailView: View {
                         Button {
                             startTrail = true
                         } label: {
-                            Label("Inizia percorso verso l'evento", systemImage: "figure.hiking")
+                            Label(localizer.localizedString(for: "start_trail_event"), systemImage: "figure.hiking")
                                 .font(.headline)
                                 .foregroundColor(.white)
                                 .frame(maxWidth: .infinity)
                                 .padding()
-                                .background(Color("WWFGreen"))
+                                .background(WWFStyle.Colors.green)
                                 .clipShape(RoundedRectangle(cornerRadius: 14))
                         }
                         .padding(.horizontal)
@@ -190,18 +191,18 @@ struct EventDetailView: View {
                             HStack(spacing: 12) {
                                 Image(systemName: "mappin.circle.fill")
                                     .font(.title2)
-                                    .foregroundColor(Color("WWFGreen"))
+                                    .foregroundColor(WWFStyle.Colors.green)
                                 VStack(alignment: .leading, spacing: 2) {
-                                    Text("Luogo: \(poi.name)")
+                                    Text("\(localizer.localizedString(for: "place_label")): \(poi.localizedName)")
                                         .font(.subheadline)
                                         .fontWeight(.semibold)
-                                    Text("Raggiungi il punto segnalato sulla mappa dell'Oasi.")
+                                    Text(localizer.localizedString(for: "reach_marked_point"))
                                         .font(.caption)
                                         .foregroundColor(.secondary)
                                 }
                             }
                             .padding()
-                            .background(Color("WWFGreen").opacity(0.08))
+                            .background(WWFStyle.Colors.green.opacity(0.08))
                             .clipShape(RoundedRectangle(cornerRadius: 12))
                             .padding(.horizontal)
                         }
@@ -230,6 +231,7 @@ struct EventDetailView: View {
 
 struct TrailEventCard: View {
     let trail: Trail
+    @ObservedObject private var localizer = LocalizationManager.shared
 
     var difficulty: TrailDifficulty {
         trail.difficulty ?? .easy
@@ -247,8 +249,8 @@ struct TrailEventCard: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Image(systemName: "signpost.right.and.left.fill")
-                    .foregroundColor(Color("WWFGreen"))
-                Text(trail.name)
+                    .foregroundColor(WWFStyle.Colors.green)
+                Text(trail.localizedName)
                     .font(.subheadline)
                     .fontWeight(.semibold)
                 Spacer()
@@ -258,29 +260,29 @@ struct TrailEventCard: View {
             }
 
             HStack(spacing: 14) {
-                Label(difficulty.rawValue, systemImage: difficulty.icon)
+                Label(localizer.localizedString(for: "difficulty_" + difficulty.rawValue), systemImage: difficulty.icon)
                     .font(.caption)
                     .fontWeight(.semibold)
                     .foregroundColor(difficultyColor)
                 Label("\(trail.estimatedMinutes ?? 60) min", systemImage: "clock")
                     .font(.caption)
                     .foregroundColor(.secondary)
-                Label("\(trail.steps.count) tappe", systemImage: "mappin.and.ellipse")
+                Label("\(trail.steps.count) \(localizer.localizedString(for: "steps_label"))", systemImage: "mappin.and.ellipse")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
 
-            Text(trail.trailDescription)
+            Text(trail.localizedDescription)
                 .font(.caption)
                 .foregroundColor(.secondary)
                 .lineLimit(2)
         }
         .padding()
-        .background(Color("WWFGreen").opacity(0.06))
+        .background(WWFStyle.Colors.green.opacity(0.06))
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .overlay(
             RoundedRectangle(cornerRadius: 12)
-                .stroke(Color("WWFGreen").opacity(0.2), lineWidth: 1)
+                .stroke(WWFStyle.Colors.green.opacity(0.2), lineWidth: 1)
         )
     }
 }

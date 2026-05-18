@@ -1,6 +1,9 @@
 //
 //  Trail.swift
-//  GestionaleWWFIpad
+//  WWFChallenge7
+//
+//  SwiftData entity — mirrors Supabase table: public.paths
+//  Identical schema to GestionaleWWFIpad/Domain/Entities/Trail.swift
 //
 
 import Foundation
@@ -8,7 +11,7 @@ import SwiftData
 import SwiftUI
 
 @Model
-final class Trail {
+final class Trail: @unchecked Sendable {
     var id: UUID
     var name: String
     var trailDescription: String
@@ -28,6 +31,15 @@ final class Trail {
         get { difficultyRawValue.flatMap { TrailDifficulty(rawValue: $0) } }
         set { difficultyRawValue = newValue?.rawValue }
     }
+
+    @Transient var localizedName: String {
+        LocalizationManager.shared.localizedField(table: "paths", recordId: id, fieldName: "name", fallback: name)
+    }
+
+    @Transient var localizedDescription: String {
+        LocalizationManager.shared.localizedField(table: "paths", recordId: id, fieldName: "description", fallback: trailDescription)
+    }
+
 
     init(
         name: String,
@@ -76,34 +88,6 @@ final class Trail {
         }
         needsSync = false
     }
-}
-
-extension Trail {
-    func toSupabaseParams() -> [String: Any?] {
-        return [
-            "p_id": id.uuidString,
-            "p_name": name,
-            "p_description": trailDescription,
-            "p_is_active": isActive,
-            "p_difficulty": difficultyRawValue,
-            "p_estimated_minutes": estimatedMinutes,
-            "p_cover_image_url": coverImageURL,
-            "p_start_poi_id": startPOIId?.uuidString
-        ]
-    }
-
-    func stepsToJSON() -> [[String: Any?]] {
-        sortedSteps.map { step in
-            [
-                "id": step.id.uuidString,
-                "poi_id": step.poi?.id.uuidString,
-                "step_order": step.stepOrder,
-                "direction_hint": step.directionHint,
-                "distance_meters": step.distanceMeters,
-                "estimated_minutes": step.estimatedMinutes
-            ]
-        }
-    }
 
     // MARK: - Backward Compatibility for Visitor App
     var startX: Double {
@@ -115,11 +99,11 @@ extension Trail {
     }
     
     var startPointName: String {
-        sortedSteps.first?.poi?.name ?? "Punto di Partenza"
+        sortedSteps.first?.poi?.localizedName ?? LocalizationManager.shared.localizedString(for: "start_point_fallback")
     }
     
     var startPointDescription: String {
-        sortedSteps.first?.poi?.poiDescription ?? "Inizia qui il tuo percorso."
+        sortedSteps.first?.poi?.localizedDescription ?? LocalizationManager.shared.localizedString(for: "start_point_fallback_desc")
     }
 }
 
@@ -138,9 +122,9 @@ enum TrailDifficulty: String, Codable, CaseIterable {
 
     var color: Color {
         switch self {
-        case .easy:   return .green
-        case .medium: return .orange
-        case .hard:   return .red
+        case .easy:   return WWFStyle.Colors.green
+        case .medium: return WWFStyle.Colors.warning
+        case .hard:   return WWFStyle.Colors.danger
         }
     }
 
@@ -154,7 +138,7 @@ enum TrailDifficulty: String, Codable, CaseIterable {
 
     var supabaseValue: String { rawValue }
 
-    static func fromSupabase(_ value: String) -> TrailDifficulty? {
+    nonisolated static func fromSupabase(_ value: String) -> TrailDifficulty? {
         TrailDifficulty(rawValue: value)
     }
 }

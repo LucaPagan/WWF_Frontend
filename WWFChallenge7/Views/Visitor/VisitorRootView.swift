@@ -2,38 +2,36 @@
 //  VisitorRootView.swift
 //  WWFChallenge7
 //
-//  Created by Luca Pagano on 06/05/26.
+//  Root tab view — uses UserSession instead of the old ManagerSession.
 //
-
 
 import SwiftUI
 
 struct VisitorRootView: View {
-    @EnvironmentObject var managerSession: ManagerSession
+    @EnvironmentObject var userSession: UserSession
     @State private var selectedTab: Int = 0
+    @ObservedObject private var localizer = LocalizationManager.shared
 
     var body: some View {
         TabView(selection: $selectedTab) {
             DashboardView()
                 .tabItem {
-                    Label("Esplora", systemImage: "map.fill")
+                    Label(localizer.localizedString(for: "explore"), systemImage: "map.fill")
                 }
                 .tag(0)
 
             EventListView()
                 .tabItem {
-                    Label("Eventi", systemImage: "calendar.badge.clock")
+                    Label(localizer.localizedString(for: "events"), systemImage: "calendar.badge.clock")
                 }
                 .tag(1)
 
             ProfileView()
                 .tabItem {
-                    Label("Profilo", systemImage: "person.fill")
+                    Label(localizer.localizedString(for: "profile"), systemImage: "person.fill")
                 }
                 .tag(2)
-
-
         }
-        .accentColor(Color("WWFGreen"))
+        .accentColor(WWFStyle.Colors.green)
     }
 }

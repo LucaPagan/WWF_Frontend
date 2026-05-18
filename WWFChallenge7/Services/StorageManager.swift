@@ -1,20 +1,23 @@
 //
 //  StorageService.swift
-//  GestionaleWWFIpad
+//  WWFChallenge7
+//
+//  Storage service for the User (visitor) module.
+//  Read-only: downloads only, no uploads.
 //
 
 import Foundation
 
 protocol StorageService: Sendable {
-    func uploadImage(data: Data, path: String) async throws -> String
+    func downloadData(from url: String) async throws -> Data
 }
 
 final class StorageManager: StorageService {
     static let shared = StorageManager()
-    
+
     private init() {}
-    
-    func uploadImage(data: Data, path: String) async throws -> String {
-        return try await SupabaseConfig.shared.uploadFile(bucket: "media", path: path, data: data, contentType: "image/jpeg")
+
+    func downloadData(from url: String) async throws -> Data {
+        return try await SupabaseConfig.shared.downloadFile(from: url)
     }
 }

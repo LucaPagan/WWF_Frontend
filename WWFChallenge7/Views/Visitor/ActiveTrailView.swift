@@ -3,10 +3,17 @@ import SwiftUI
 // MARK: - Stato navigazione
 
 enum TrailNavigationState {
-    case atStart                    // Utente al punto di partenza, non ha ancora scansionato nulla
-    case navigatingTo(TrailStep)    // Sta camminando verso un POI
-    case poiReached(POI)            // Ha appena scansionato un QR, modale aperto
-    case completed                  // Tutti i POI completati
+    case atStart
+    case navigatingTo(TrailStep)
+    case poiReached(POI)
+    case completed
+}
+
+// MARK: - Map Display Mode
+
+enum MapDisplayMode: Equatable {
+    case flat2D
+    case model3D(ThreeDMapType)
 }
 
 // MARK: - ActiveTrailView
@@ -14,19 +21,27 @@ enum TrailNavigationState {
 struct ActiveTrailView: View {
     let trail: Trail
     @Environment(\.dismiss) private var dismiss
+    @ObservedObject private var localizer = LocalizationManager.shared
 
-    // Stato navigazione
+    // Navigation state
     @State private var completedPOIIds: Set<UUID> = []
     @State private var navigationState: TrailNavigationState = .atStart
+    @State private var mapDisplayMode: MapDisplayMode = .flat2D
 
-    // Scanner e modali
-    @State private var showScanner = false
-    @State private var showPOIModal = false
+    // Scanner / modals
+    @State private var showScanner     = false
+    @State private var showPOIModal    = false
     @State private var scannedPOI: POI? = nil
     @State private var showQRErrorAlert = false
-    @State private var qrErrorMessage = ""
+    @State private var qrErrorMessage  = ""
 
-    // Step corrente
+    // MARK: Computed helpers
+
+    private var isRealistic: Bool {
+        if case .model3D(let t) = mapDisplayMode { return t == .realistic }
+        return false
+    }
+
     var currentStep: TrailStep? {
         trail.currentStep(completedPOIIds: completedPOIIds)
     }
@@ -40,21 +55,19 @@ struct ActiveTrailView: View {
         completedPOIIds.count >= trail.steps.count && !trail.steps.isEmpty
     }
 
-    // Posizione attuale sulla mappa (normalizzata)
     var currentNormalizedPosition: CGPoint {
         switch navigationState {
         case .atStart:
             return CGPoint(x: trail.startX, y: trail.startY)
-        case .navigatingTo(_):
-            // Mostra l'ultimo POI completato, o il punto di partenza
-            if let lastCompleted = trail.sortedSteps
+        case .navigatingTo:
+            if let lastPOI = trail.sortedSteps
                 .filter({ step in
                     guard let poi = step.poi else { return false }
                     return completedPOIIds.contains(poi.id)
                 })
-                .sorted(by: { $0.orderIndex > $1.orderIndex })
+                .sorted(by: { $0.stepOrder > $1.stepOrder })
                 .first?.poi {
-                return CGPoint(x: lastCompleted.x, y: lastCompleted.y)
+                return CGPoint(x: lastPOI.x, y: lastPOI.y)
             }
             return CGPoint(x: trail.startX, y: trail.startY)
         case .poiReached(let poi):
@@ -65,29 +78,25 @@ struct ActiveTrailView: View {
         }
     }
 
+    // MARK: Body
+
     var body: some View {
         ZStack(alignment: .bottom) {
 
-            // MARK: Mappa interattiva (UIScrollView-based, same as manager)
-            VisitorMapView(
-                trail: trail,
-                completedPOIIds: completedPOIIds,
-                currentStepPOIId: currentStep?.poi?.id,
-                currentNormalizedPosition: currentNormalizedPosition,
-                navigationState: navigationState
-            )
-            .ignoresSafeArea()
+            // ── Map ──────────────────────────────────────────────────────────
+            mapLayer
+                .ignoresSafeArea()
 
-            // MARK: Pannello navigazione inferiore
+            // ── Bottom navigation panel ───────────────────────────────────────
             VStack(spacing: 0) {
-                ProgressBar(fraction: progressFraction)
+                // Ensure ProgressBar is a valid struct in your project.
+                // Replace with ProgressView(value: progressFraction) if you don't have it.
+                ProgressView(value: progressFraction)
+                    .progressViewStyle(LinearProgressViewStyle(tint: WWFStyle.Colors.green))
                     .frame(height: 4)
 
                 VStack(spacing: 12) {
-                    // Card stato corrente
                     navigationCard
-
-                    // Bottone azione principale
                     actionButton
                 }
                 .padding()
@@ -98,16 +107,20 @@ struct ActiveTrailView: View {
                 )
             }
         }
-        // Bottone chiudi
+        // ── Top-leading controls ──────────────────────────────────────────────
         .overlay(alignment: .topLeading) {
-            Button { dismiss() } label: {
-                Image(systemName: "xmark.circle.fill")
-                    .font(.title)
-                    .foregroundStyle(.white, Color.black.opacity(0.4))
-                    .padding()
+            VStack(spacing: 16) {
+                Button { dismiss() } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.title)
+                        .foregroundStyle(.white, Color.black.opacity(0.4))
+                }
+
+                mapSwitcherMenu
             }
+            .padding()
         }
-        // Progress label overlay
+        // ── Progress label ───────────────────────────────────────────────────
         .overlay(alignment: .topTrailing) {
             Text("\(completedPOIIds.count)/\(trail.steps.count)")
                 .font(.caption)
@@ -120,33 +133,91 @@ struct ActiveTrailView: View {
                 .padding(.top, 16)
                 .padding(.trailing, 16)
         }
-        // Scanner QR
+        // ── Sheets / Alerts ───────────────────────────────────────────────────
         .sheet(isPresented: $showScanner) {
-            QRScannerView { payload in
-                handleQRScan(payload: payload)
-            }
+            QRScannerView { payload in handleQRScan(payload: payload) }
         }
-        // Modale POI
         .sheet(isPresented: $showPOIModal, onDismiss: handleModalDismiss) {
             if let poi = scannedPOI {
-                POIModalView(poi: poi, onContinue: {
-                    showPOIModal = false
-                })
+                POIModalView(poi: poi, onContinue: { showPOIModal = false })
             }
         }
-        // Alert QR errato
-        .alert("QR non riconosciuto", isPresented: $showQRErrorAlert) {
-            Button("OK", role: .cancel) {}
+        .alert(localizer.localizedString(for: "qr_error"), isPresented: $showQRErrorAlert) {
+            Button(localizer.localizedString(for: "ok_button"), role: .cancel) {}
         } message: {
             Text(qrErrorMessage)
         }
-        // Stato iniziale
         .onAppear {
             navigationState = .atStart
         }
     }
 
-    // MARK: - Navigation Card
+    // MARK: Map layer
+
+    @ViewBuilder
+    private var mapLayer: some View {
+        switch mapDisplayMode {
+        case .flat2D:
+            VisitorMapView(
+                trail: trail,
+                completedPOIIds: completedPOIIds,
+                currentStepPOIId: currentStep?.poi?.id,
+                currentNormalizedPosition: currentNormalizedPosition,
+                navigationState: navigationState
+            )
+        case .model3D(let mapType):
+            Visitor3DMapView(
+                trail: trail,
+                completedPOIIds: completedPOIIds,
+                currentStepPOIId: currentStep?.poi?.id,
+                currentNormalizedPosition: currentNormalizedPosition,
+                navigationState: navigationState,
+                mapType: mapType
+            )
+        }
+    }
+
+    // MARK: Map switcher menu
+
+    private var mapSwitcherMenu: some View {
+        Menu {
+            Button {
+                withAnimation { mapDisplayMode = .flat2D }
+            } label: {
+                Label(localizer.localizedString(for: "flat_2d_map"), systemImage: "map")
+            }
+
+            Divider()
+
+            ForEach(ThreeDMapType.allCases) { type in
+                Button {
+                    withAnimation { mapDisplayMode = .model3D(type) }
+                } label: {
+                    let key = type == .realistic ? "map_type_realistic" : "map_type_basic"
+                    Label(localizer.localizedString(for: key), systemImage: type == .realistic ? "arkit" : "view.3d")
+                }
+            }
+        } label: {
+            ZStack {
+                Circle()
+                    .fill(Color.black.opacity(0.4))
+                    .frame(width: 44, height: 44)
+                Image(systemName: mapIconName)
+                    .font(.title2)
+                    .foregroundColor(.white)
+            }
+        }
+        .padding(.top, 4)
+    }
+
+    private var mapIconName: String {
+        switch mapDisplayMode {
+        case .flat2D:          return "view.3d"
+        case .model3D(let t):  return t == .realistic ? "arkit" : "map"
+        }
+    }
+
+    // MARK: Navigation card
 
     @ViewBuilder
     var navigationCard: some View {
@@ -157,19 +228,16 @@ struct ActiveTrailView: View {
                 description: trail.startPointDescription,
                 nextStepInstructions: trail.sortedSteps.first?.instructions
             )
-
         case .navigatingTo(let step):
             NavigatingCard(step: step)
-
         case .poiReached(let poi):
             POIReachedCard(poi: poi)
-
         case .completed:
             CompletedBanner()
         }
     }
 
-    // MARK: - Action Button
+    // MARK: Action button
 
     @ViewBuilder
     var actionButton: some View {
@@ -180,25 +248,23 @@ struct ActiveTrailView: View {
                     navigationState = .navigatingTo(first)
                 }
             } label: {
-                Label("Inizia il percorso", systemImage: "figure.hiking")
+                Label(LocalizationManager.shared.localizedString(for: "start_trail"), systemImage: "figure.hiking")
                     .font(.headline)
                     .foregroundColor(.white)
                     .frame(maxWidth: .infinity)
                     .padding()
-                    .background(Color("WWFGreen"))
+                    .background(WWFStyle.Colors.green)
                     .clipShape(RoundedRectangle(cornerRadius: 14))
             }
 
         case .navigatingTo:
-            Button {
-                showScanner = true
-            } label: {
-                Label("Scansiona QR Code", systemImage: "qrcode.viewfinder")
+            Button { showScanner = true } label: {
+                Label(LocalizationManager.shared.localizedString(for: "scan_qr"), systemImage: "qrcode.viewfinder")
                     .font(.headline)
                     .foregroundColor(.white)
                     .frame(maxWidth: .infinity)
                     .padding()
-                    .background(Color("WWFGreen"))
+                    .background(WWFStyle.Colors.green)
                     .clipShape(RoundedRectangle(cornerRadius: 14))
             }
 
@@ -207,65 +273,64 @@ struct ActiveTrailView: View {
 
         case .completed:
             Button { dismiss() } label: {
-                Label("Torna alla home", systemImage: "house.fill")
+                Label(LocalizationManager.shared.localizedString(for: "back_to_home"), systemImage: "house.fill")
                     .font(.headline)
                     .foregroundColor(.white)
                     .frame(maxWidth: .infinity)
                     .padding()
-                    .background(Color("WWFDarkGreen"))
+                    .background(WWFStyle.Colors.darkGreen)
                     .clipShape(RoundedRectangle(cornerRadius: 14))
             }
         }
     }
 
-    // MARK: - QR Handler
+    // MARK: QR handler
 
     private func handleQRScan(payload: String) {
         showScanner = false
+        let clean = payload.trimmingCharacters(in: .whitespacesAndNewlines)
 
-        let cleanPayload = payload.trimmingCharacters(in: .whitespacesAndNewlines)
-
-        // Controlla che il percorso sia attivo
         guard trail.isActive else {
-            qrErrorMessage = "Questo percorso non è attivo. Contatta il gestore dell'oasi."
+            qrErrorMessage = localizer.localizedString(for: "trail_not_active")
             showQRErrorAlert = true
             return
         }
 
         let allPOIs = trail.sortedSteps.compactMap { $0.poi }
 
-        // 1. Il QR appartiene a questo percorso?
-        guard let matchedPOI = allPOIs.first(where: { $0.qrPayload == cleanPayload }) else {
-            // Costruisci messaggio diagnostico utile
-            let expectedPayloads = allPOIs.map { $0.qrPayload }.joined(separator: "\n• ")
+        guard let matched = allPOIs.first(where: { $0.qrPayload == clean }) else {
+            let expected = allPOIs.map { $0.qrPayload }.joined(separator: "\n• ")
+            let notRelated = localizer.localizedString(for: "qr_not_related")
+            let scanned = localizer.localizedString(for: "scanned")
+            let expectedOneOf = localizer.localizedString(for: "expected_one_of")
+            let fallbackEmpty = localizer.localizedString(for: "no_pois_in_trail")
+            
             qrErrorMessage = """
-            Questo QR code non appartiene al percorso attivo.
+            \(notRelated)
 
-            📷 Scansionato:
-            \(cleanPayload)
+            📷 \(scanned):
+            \(clean)
 
-            ✅ Attesi per questo percorso:
-            • \(expectedPayloads.isEmpty ? "(nessun POI nel percorso)" : expectedPayloads)
+            ✅ \(expectedOneOf):
+            • \(expected.isEmpty ? fallbackEmpty : expected)
             """
             showQRErrorAlert = true
             return
         }
 
-        // 2. È già stato completato?
-        if completedPOIIds.contains(matchedPOI.id) {
-            qrErrorMessage = "Hai già visitato \"\(matchedPOI.name)\". Procedi verso la prossima tappa."
+        if completedPOIIds.contains(matched.id) {
+            qrErrorMessage = localizer.localizedString(for: "poi_already_visited")
             showQRErrorAlert = true
             return
         }
 
-        // 3. Accetta il POI (anche se fuori ordine)
-        completedPOIIds.insert(matchedPOI.id)
-        scannedPOI = matchedPOI
-        navigationState = .poiReached(matchedPOI)
+        completedPOIIds.insert(matched.id)
+        scannedPOI = matched
+        navigationState = .poiReached(matched)
         showPOIModal = true
     }
 
-    // MARK: - Modal Dismiss Handler
+    // MARK: Modal dismiss
 
     private func handleModalDismiss() {
         if isCompleted {
@@ -276,7 +341,7 @@ struct ActiveTrailView: View {
     }
 }
 
-// MARK: - Card: Punto di partenza
+// MARK: - StartPointCard
 
 struct StartPointCard: View {
     let name: String
@@ -287,43 +352,30 @@ struct StartPointCard: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 10) {
                 ZStack {
-                    Circle()
-                        .fill(Color("WWFGreen"))
-                        .frame(width: 36, height: 36)
-                    Image(systemName: "flag.fill")
-                        .font(.caption)
-                        .foregroundColor(.white)
+                    Circle().fill(WWFStyle.Colors.green).frame(width: 36, height: 36)
+                    Image(systemName: "flag.fill").font(.caption).foregroundColor(.white)
                 }
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Sei qui: \(name)")
-                        .font(.subheadline)
-                        .fontWeight(.bold)
-                    Text(description)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .lineLimit(2)
+                    Text("\(LocalizationManager.shared.localizedString(for: "you_are_here")): \(name)").font(.subheadline).fontWeight(.bold)
+                    Text(description).font(.caption).foregroundColor(.secondary).lineLimit(2)
                 }
             }
             if let instructions = nextStepInstructions {
                 Divider()
                 HStack(spacing: 8) {
                     Image(systemName: "arrow.turn.up.right")
-                        .foregroundColor(Color("WWFGreen"))
-                        .font(.caption)
-                    Text(instructions)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .lineLimit(3)
+                        .foregroundColor(WWFStyle.Colors.green).font(.caption)
+                    Text(instructions).font(.caption).foregroundColor(.secondary).lineLimit(3)
                 }
             }
         }
         .padding()
-        .background(Color("WWFGreen").opacity(0.08))
+        .background(WWFStyle.Colors.green.opacity(0.08))
         .clipShape(RoundedRectangle(cornerRadius: 14))
     }
 }
 
-// MARK: - Card: In navigazione
+// MARK: - NavigatingCard
 
 struct NavigatingCard: View {
     let step: TrailStep
@@ -332,34 +384,22 @@ struct NavigatingCard: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 10) {
                 ZStack {
-                    Circle()
-                        .fill(Color.orange)
-                        .frame(width: 36, height: 36)
+                    Circle().fill(Color.orange).frame(width: 36, height: 36)
                     Image(systemName: "arrow.triangle.turn.up.right.circle.fill")
-                        .font(.caption)
-                        .foregroundColor(.white)
+                        .font(.caption).foregroundColor(.white)
                 }
                 VStack(alignment: .leading, spacing: 2) {
                     if let poi = step.poi {
-                        Text("Dirigiti verso: \(poi.name)")
-                            .font(.subheadline)
-                            .fontWeight(.bold)
+                        Text("\(LocalizationManager.shared.localizedString(for: "go_to")): \(poi.localizedName)").font(.subheadline).fontWeight(.bold)
                     }
-                    Text("Scansiona il QR code quando arrivi")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                    Text(LocalizationManager.shared.localizedString(for: "scan_qr_desc")).font(.caption).foregroundColor(.secondary)
                 }
             }
             Divider()
             HStack(alignment: .top, spacing: 8) {
                 Image(systemName: "arrow.turn.up.right")
-                    .foregroundColor(.orange)
-                    .font(.caption)
-                    .padding(.top, 2)
-                Text(step.instructions)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .lineLimit(4)
+                    .foregroundColor(.orange).font(.caption).padding(.top, 2)
+                Text(step.instructions).font(.caption).foregroundColor(.secondary).lineLimit(4)
             }
         }
         .padding()
@@ -368,7 +408,7 @@ struct NavigatingCard: View {
     }
 }
 
-// MARK: - Card: POI raggiunto
+// MARK: - POIReachedCard
 
 struct POIReachedCard: View {
     let poi: POI
@@ -376,21 +416,12 @@ struct POIReachedCard: View {
     var body: some View {
         HStack(spacing: 12) {
             ZStack {
-                Circle()
-                    .fill(Color.green)
-                    .frame(width: 36, height: 36)
-                Image(systemName: "checkmark")
-                    .font(.caption)
-                    .fontWeight(.bold)
-                    .foregroundColor(.white)
+                Circle().fill(Color.green).frame(width: 36, height: 36)
+                Image(systemName: "checkmark").font(.caption).fontWeight(.bold).foregroundColor(.white)
             }
             VStack(alignment: .leading, spacing: 2) {
-                Text("Raggiunto: \(poi.name)")
-                    .font(.subheadline)
-                    .fontWeight(.bold)
-                Text("Visualizza le informazioni nel pannello")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                Text("\(LocalizationManager.shared.localizedString(for: "reached")): \(poi.localizedName)").font(.subheadline).fontWeight(.bold)
+                Text(LocalizationManager.shared.localizedString(for: "view_info")).font(.caption).foregroundColor(.secondary)
             }
             Spacer()
         }
@@ -400,61 +431,22 @@ struct POIReachedCard: View {
     }
 }
 
-// MARK: - Marker punto di partenza (legacy — kept for reference but VisitorMapView uses UIKit markers)
-
-struct StartPointMarker: View {
-    let name: String
-    let isCurrent: Bool
-
+// MARK: - CompletedBanner (Mock for component)
+/*struct CompletedBanner: View {
     var body: some View {
-        VStack(spacing: 2) {
+        HStack(spacing: 12) {
             ZStack {
-                if isCurrent {
-                    Circle()
-                        .fill(Color("WWFGreen").opacity(0.25))
-                        .frame(width: 44, height: 44)
-                }
-                Circle()
-                    .fill(Color("WWFGreen"))
-                    .frame(width: 30, height: 30)
-                    .overlay(
-                        Image(systemName: "flag.fill")
-                            .font(.caption2)
-                            .foregroundColor(.white)
-                    )
-                    .shadow(radius: 3)
+                Circle().fill(Color.blue).frame(width: 36, height: 36)
+                Image(systemName: "star.fill").font(.caption).fontWeight(.bold).foregroundColor(.white)
             }
-            Text(name)
-                .font(.system(size: 9, weight: .semibold))
-                .foregroundColor(.white)
-                .padding(.horizontal, 5)
-                .padding(.vertical, 2)
-                .background(Color.black.opacity(0.55))
-                .clipShape(Capsule())
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Trail Completed!").font(.subheadline).fontWeight(.bold)
+                Text("Great job navigating the trail.").font(.caption).foregroundColor(.secondary)
+            }
+            Spacer()
         }
+        .padding()
+        .background(Color.blue.opacity(0.08))
+        .clipShape(RoundedRectangle(cornerRadius: 14))
     }
-}
-
-// MARK: - Indicatore posizione utente (legacy — kept for reference)
-
-struct UserLocationIndicator: View {
-    @State private var pulse = false
-
-    var body: some View {
-        ZStack {
-            Circle()
-                .fill(Color.blue.opacity(0.2))
-                .frame(width: 40, height: 40)
-                .scaleEffect(pulse ? 1.4 : 1.0)
-                .opacity(pulse ? 0 : 0.6)
-                .animation(.easeOut(duration: 1.4).repeatForever(autoreverses: false), value: pulse)
-
-            Circle()
-                .fill(Color.blue)
-                .frame(width: 16, height: 16)
-                .overlay(Circle().stroke(Color.white, lineWidth: 2))
-                .shadow(radius: 3)
-        }
-        .onAppear { pulse = true }
-    }
-}
+}*/
