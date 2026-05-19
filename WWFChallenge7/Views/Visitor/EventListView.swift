@@ -3,6 +3,7 @@
 //  WWFChallenge7
 //
 //  Created by Luca Pagano on 06/05/26.
+//  Redesigned — Maggio 2026
 //
 
 import SwiftUI
@@ -18,11 +19,13 @@ struct EventListView: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 24) {
+            ScrollView(showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 20) {
 
-                    // Header
+                    // Premium Custom Organic Banner Header
                     EventsHeaderView()
+                        .padding(.horizontal, 16)
+                        .padding(.top, 10)
 
                     // Today's Events
                     let todayEvents = events.filter { $0.isToday }
@@ -31,15 +34,16 @@ struct EventListView: View {
                             HStack(spacing: 8) {
                                 Image(systemName: "sparkles")
                                     .foregroundColor(.orange)
+                                    .font(.system(size: 16, weight: .bold))
                                 Text(localizer.localizedString(for: "today_oasis"))
-                                    .font(.title2)
-                                    .fontWeight(.bold)
+                                    .font(WWFDesign.Typography.sectionTitle)
+                                    .foregroundColor(WWFDesign.Colors.forestDark)
                             }
-                            .padding(.horizontal)
+                            .padding(.horizontal, 16)
 
                             ForEach(todayEvents) { event in
                                 EventCardView(event: event, isHighlighted: true)
-                                    .padding(.horizontal)
+                                    .padding(.horizontal, 16)
                                     .onTapGesture { selectedEvent = event }
                             }
                         }
@@ -49,9 +53,9 @@ struct EventListView: View {
                     let upcoming = events.filter { $0.isUpcoming && !$0.isToday }
                     VStack(alignment: .leading, spacing: 12) {
                         Text(localizer.localizedString(for: "upcoming_events"))
-                            .font(.title2)
-                            .fontWeight(.bold)
-                            .padding(.horizontal)
+                            .font(WWFDesign.Typography.sectionTitle)
+                            .foregroundColor(WWFDesign.Colors.forestDark)
+                            .padding(.horizontal, 16)
 
                         if upcoming.isEmpty && todayEvents.isEmpty {
                             ContentUnavailableView(
@@ -62,13 +66,13 @@ struct EventListView: View {
                             .padding(.top, 40)
                         } else if upcoming.isEmpty {
                             Text(localizer.localizedString(for: "no_other_events"))
-                                .font(.subheadline)
+                                .font(WWFDesign.Typography.trailDesc)
                                 .foregroundColor(.secondary)
-                                .padding(.horizontal)
+                                .padding(.horizontal, 16)
                         } else {
                             ForEach(upcoming) { event in
                                 EventCardView(event: event, isHighlighted: false)
-                                    .padding(.horizontal)
+                                    .padding(.horizontal, 16)
                                     .onTapGesture { selectedEvent = event }
                             }
                         }
@@ -76,10 +80,9 @@ struct EventListView: View {
 
                     Spacer(minLength: 40)
                 }
-                .padding(.top)
+                .padding(.vertical, 8)
             }
-            .navigationTitle(localizer.localizedString(for: "events"))
-            .navigationBarTitleDisplayMode(.large)
+            .background(Color(.systemGroupedBackground).ignoresSafeArea())
             .fullScreenCover(item: $selectedEvent) { event in
                 EventDetailView(event: event)
             }
@@ -93,32 +96,78 @@ struct EventsHeaderView: View {
     @ObservedObject private var localizer = LocalizationManager.shared
 
     var body: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 16)
-                .fill(
-                    LinearGradient(
-                        colors: [Color(hex: "#283593")!.opacity(0.85), Color(hex: "#1565C0")!],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-                .frame(height: 140)
+        ZStack(alignment: .bottomLeading) {
+            // Sfondo scuro cenere vulcanica / tramonto caldo
+            RoundedRectangle(cornerRadius: WWFDesign.Radius.hero)
+                .fill(Color(red: 0.184, green: 0.110, blue: 0.102))
+                .frame(height: 190)
 
-            VStack(spacing: 8) {
-                Image(systemName: "calendar.badge.clock")
-                    .font(.system(size: 36))
-                    .foregroundColor(.white.opacity(0.9))
-                Text(localizer.localizedString(for: "events_activities"))
-                    .font(.headline)
-                    .foregroundColor(.white)
-                Text(localizer.localizedString(for: "events_oasis_desc"))
-                    .font(.caption)
-                    .foregroundColor(.white.opacity(0.8))
-                    .multilineTextAlignment(.center)
+            // Pattern organico — cerchi sfumati vulcanici caldi
+            GeometryReader { geo in
+                ZStack {
+                    Circle()
+                        .fill(Color(red: 0.353, green: 0.180, blue: 0.149))
+                        .frame(width: 200, height: 200)
+                        .blur(radius: 50)
+                        .offset(x: geo.size.width * 0.6, y: -30)
+                        .opacity(0.6)
+
+                    Circle()
+                        .fill(Color(red: 0.588, green: 0.314, blue: 0.235))
+                        .frame(width: 100, height: 100)
+                        .blur(radius: 40)
+                        .offset(x: geo.size.width * 0.75, y: 60)
+                        .opacity(0.25)
+                }
             }
-            .padding(.horizontal)
+            .clipShape(RoundedRectangle(cornerRadius: WWFDesign.Radius.hero))
+
+            // Icona scintilla attività decorativa in alto a destra
+            Image(systemName: "sparkles")
+                .font(.system(size: 110))
+                .foregroundColor(Color(red: 0.949, green: 0.600, blue: 0.290).opacity(0.07))
+                .rotationEffect(.degrees(-15))
+                .offset(x: geoSizeOffsetForEvents(), y: -20)
+
+            // Contenuto
+            VStack(alignment: .leading, spacing: 8) {
+                // Badge eventi attivo
+                HStack(spacing: 5) {
+                    Circle()
+                        .fill(Color(red: 0.949, green: 0.600, blue: 0.290))
+                        .frame(width: 6, height: 6)
+                    Text(localizer.localizedString(for: "events_activities").uppercased())
+                        .font(WWFDesign.Typography.badge)
+                        .fontWeight(.bold)
+                        .foregroundColor(Color(red: 0.961, green: 0.769, blue: 0.588))
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(Color(red: 0.690, green: 0.329, blue: 0.180).opacity(0.18))
+                .overlay(
+                    Capsule().stroke(Color(red: 0.690, green: 0.329, blue: 0.180).opacity(0.35), lineWidth: 0.5)
+                )
+                .clipShape(Capsule())
+
+                Spacer()
+
+                // Titolo principale
+                Text("Oasi Events")
+                    .font(WWFDesign.Typography.heroTitle)
+                    .foregroundColor(.white)
+                
+                Text(localizer.localizedString(for: "events_oasis_desc"))
+                    .font(WWFDesign.Typography.heroSubtitle)
+                    .foregroundColor(.white.opacity(0.85))
+            }
+            .padding(20)
+            .frame(height: 190, alignment: .leading)
         }
-        .padding(.horizontal)
+        .clipShape(RoundedRectangle(cornerRadius: WWFDesign.Radius.hero))
+    }
+
+    private func geoSizeOffsetForEvents() -> CGFloat {
+        return UIScreen.main.bounds.width - 180
     }
 }
 
@@ -134,100 +183,113 @@ struct EventCardView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            // Top: category + data
-            HStack {
-                // Category Badge
-                HStack(spacing: 4) {
-                    Image(systemName: event.category.icon)
-                        .font(.caption2)
-                    Text(localizer.localizedString(for: "event_cat_" + event.category.rawValue))
-                        .font(.caption2)
-                        .fontWeight(.semibold)
+        HStack(spacing: 0) {
+            // Elegant category accent bar on the left
+            RoundedRectangle(cornerRadius: 0)
+                .fill(categoryColor)
+                .frame(width: 5)
+            
+            VStack(alignment: .leading, spacing: 12) {
+                // Top row: category + today pill
+                HStack {
+                    // Category Badge
+                    HStack(spacing: 4) {
+                        Image(systemName: event.category.icon)
+                            .font(.system(size: 10, weight: .bold))
+                        Text(localizer.localizedString(for: "event_cat_" + event.category.rawValue))
+                            .font(WWFDesign.Typography.badge)
+                            .fontWeight(.bold)
+                    }
+                    .foregroundColor(categoryColor)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(categoryColor.opacity(0.08))
+                    .overlay(
+                        Capsule().stroke(categoryColor.opacity(0.2), lineWidth: 0.5)
+                    )
+                    .clipShape(Capsule())
+
+                    Spacer()
+
+                    if event.isToday {
+                        Text(localizer.localizedString(for: "today_upper"))
+                            .font(.system(size: 9, weight: .black))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Color.orange)
+                            .clipShape(Capsule())
+                    }
                 }
-                .foregroundColor(categoryColor)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(categoryColor.opacity(0.12))
-                .clipShape(Capsule())
 
-                Spacer()
+                // Title and description
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(event.localizedName)
+                            .font(WWFDesign.Typography.trailName)
+                            .foregroundColor(WWFDesign.Colors.forestDark)
 
-                if event.isToday {
-                    Text(localizer.localizedString(for: "today_upper"))
+                        Text(event.localizedDescription)
+                            .font(WWFDesign.Typography.trailDesc)
+                            .foregroundColor(.secondary)
+                            .lineLimit(2)
+                    }
+                    Spacer()
+                    Image(systemName: "chevron.right")
                         .font(.caption2)
-                        .fontWeight(.black)
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(Color.orange)
-                        .clipShape(Capsule())
+                        .foregroundColor(WWFDesign.Colors.forestMid.opacity(0.5))
                 }
-            }
 
-            // Title and description
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(event.localizedName)
-                        .font(.headline)
-                        .foregroundColor(.primary)
-
-                    Text(event.localizedDescription)
-                        .font(.subheadline)
+                // Info chips
+                HStack(spacing: 12) {
+                    Label(event.formattedDate, systemImage: "calendar")
+                        .font(WWFDesign.Typography.metaLabel)
                         .foregroundColor(.secondary)
-                        .lineLimit(2)
-                }
-                Spacer()
-                Image(systemName: "chevron.right")
-                    .foregroundColor(.secondary)
-            }
 
-            // Info chips
-            HStack(spacing: 12) {
-                Label(event.formattedDate, systemImage: "calendar")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-
-                Label(event.formattedTimeRange, systemImage: "clock")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-
-                if event.price > 0 {
-                    Label(String(format: "€ %.2f", event.price), systemImage: "eurosign.circle")
-                        .font(.caption)
+                    Label(event.formattedTimeRange, systemImage: "clock")
+                        .font(WWFDesign.Typography.metaLabel)
                         .foregroundColor(.secondary)
-                } else {
-                    Label(localizer.localizedString(for: "free_price"), systemImage: "eurosign.circle")
-                        .font(.caption)
-                        .foregroundColor(.green)
-                        .fontWeight(.semibold)
-                }
-            }
 
-            // Associated trail
-            if let trail = event.trail {
-                HStack(spacing: 6) {
-                    Image(systemName: "signpost.right.and.left.fill")
-                        .font(.caption2)
-                        .foregroundColor(WWFStyle.Colors.green)
-                    Text("\(localizer.localizedString(for: "associated_trail")): \(trail.localizedName)")
-                        .font(.caption)
-                        .foregroundColor(WWFStyle.Colors.green)
-                        .fontWeight(.medium)
+                    if event.price > 0 {
+                        Label(String(format: "€ %.2f", event.price), systemImage: "eurosign.circle")
+                            .font(WWFDesign.Typography.metaLabel)
+                            .foregroundColor(.secondary)
+                    } else {
+                        Label(localizer.localizedString(for: "free_price"), systemImage: "eurosign.circle")
+                            .font(WWFDesign.Typography.metaLabel)
+                            .foregroundColor(WWFDesign.Colors.forestLight)
+                            .fontWeight(.semibold)
+                    }
                 }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(WWFStyle.Colors.green.opacity(0.08))
-                .clipShape(Capsule())
+
+                // Associated trail chip
+                if let trail = event.trail {
+                    HStack(spacing: 6) {
+                        Image(systemName: "signpost.right.and.left.fill")
+                            .font(.system(size: 9))
+                            .foregroundColor(WWFDesign.Colors.forestMid)
+                        Text("\(localizer.localizedString(for: "associated_trail")): \(trail.localizedName)")
+                            .font(WWFDesign.Typography.metaLabel)
+                            .foregroundColor(WWFDesign.Colors.forestMid)
+                            .fontWeight(.medium)
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(WWFDesign.Colors.forestMid.opacity(0.06))
+                    .overlay(
+                        Capsule().stroke(WWFDesign.Colors.forestMid.opacity(0.15), lineWidth: 0.5)
+                    )
+                    .clipShape(Capsule())
+                }
             }
+            .padding()
         }
-        .padding()
         .background(Color(.systemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 14))
-        .shadow(color: .black.opacity(isHighlighted ? 0.12 : 0.07), radius: isHighlighted ? 8 : 6, x: 0, y: 2)
+        .clipShape(RoundedRectangle(cornerRadius: WWFDesign.Radius.card))
+        .shadow(color: .black.opacity(isHighlighted ? 0.08 : 0.04), radius: isHighlighted ? 8 : 4, x: 0, y: 2)
         .overlay(
-            RoundedRectangle(cornerRadius: 14)
-                .stroke(isHighlighted ? Color.orange.opacity(0.4) : Color.clear, lineWidth: isHighlighted ? 1.5 : 0)
+            RoundedRectangle(cornerRadius: WWFDesign.Radius.card)
+                .stroke(isHighlighted ? Color.orange.opacity(0.3) : Color.clear, lineWidth: 1.5)
         )
     }
 }

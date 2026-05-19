@@ -365,7 +365,7 @@ struct Visitor3DMapView: UIViewRepresentable {
                     let cyl = SCNCylinder(radius: radius, height: CGFloat(length))
                     let mat = SCNMaterial()
                     
-                    let green = UIColor(WWFStyle.Colors.green)
+                    let green = UIColor(WWFDesign.Colors.forestLight)
                     if isCompleted {
                         mat.diffuse.contents = UIColor.gray.withAlphaComponent(0.35)
                     } else if isNextActive {

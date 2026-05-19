@@ -121,11 +121,11 @@ enum POIType: String, Codable, CaseIterable {
 
     var color: Color {
         switch self {
-        case .landmark:   return WWFStyle.Colors.green
-        case .info:       return WWFStyle.Colors.info
-        case .warning:    return WWFStyle.Colors.warning
-        case .danger:     return WWFStyle.Colors.danger
-        case .startPoint: return WWFStyle.Colors.purple
+        case .landmark:   return WWFDesign.Colors.forestLight
+        case .info:       return Color.blue
+        case .warning:    return Color.orange
+        case .danger:     return Color.red
+        case .startPoint: return WWFDesign.Colors.leafGreen
         }
     }
 

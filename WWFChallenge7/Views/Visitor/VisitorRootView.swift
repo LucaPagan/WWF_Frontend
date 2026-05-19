@@ -32,6 +32,6 @@ struct VisitorRootView: View {
                 }
                 .tag(2)
         }
-        .accentColor(WWFStyle.Colors.green)
+        .accentColor(WWFDesign.Colors.forestLight)
     }
 }

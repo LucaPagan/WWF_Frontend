@@ -338,7 +338,7 @@ struct VisitorMapView: UIViewRepresentable {
                     pathLayer.lineDashPattern = nil
                 } else if isNextActive {
                     // Current segment: Solid, thick, glowing green
-                    let green = UIColor(WWFStyle.Colors.green)
+                    let green = UIColor(WWFDesign.Colors.forestLight)
                     pathLayer.strokeColor = green.cgColor
                     pathLayer.lineWidth = 6
                     pathLayer.lineDashPattern = nil
@@ -350,7 +350,7 @@ struct VisitorMapView: UIViewRepresentable {
                     pathLayer.shadowOffset = .zero
                 } else {
                     // Future steps: Very faint dotted line
-                    pathLayer.strokeColor = UIColor(WWFStyle.Colors.green).withAlphaComponent(0.15).cgColor
+                    pathLayer.strokeColor = UIColor(WWFDesign.Colors.forestLight).withAlphaComponent(0.15).cgColor
                     pathLayer.lineWidth = 3
                     pathLayer.lineDashPattern = [4, 4]
                 }

@@ -3,8 +3,8 @@
 //  WWFChallenge7
 //
 //  Created by Luca Pagano on 06/05/26.
+//  Redesigned — Maggio 2026
 //
-
 
 import SwiftUI
 
@@ -60,7 +60,7 @@ struct TrailPathOverlay: View {
                     with: .color(
                         segmentCompleted
                             ? Color.gray.opacity(0.45)
-                            : WWFStyle.Colors.green.opacity(0.75)
+                            : WWFDesign.Colors.forestLight.opacity(0.75)
                     ),
                     style: StrokeStyle(
                         lineWidth: 3,
@@ -90,7 +90,7 @@ struct POIMarkerView: View {
                 .fill(
                     isCompleted ? Color.gray
                     : isCurrent ? Color.yellow
-                    : WWFStyle.Colors.green
+                    : WWFDesign.Colors.forestLight
                 )
                 .frame(width: 28, height: 28)
                 .overlay(
@@ -115,7 +115,7 @@ struct ProgressBar: View {
                 Rectangle()
                     .fill(Color.gray.opacity(0.2))
                 Rectangle()
-                    .fill(WWFStyle.Colors.green)
+                    .fill(WWFDesign.Colors.forestLight)
                     .frame(width: geo.size.width * fraction)
                     .animation(.spring(), value: fraction)
             }
@@ -129,7 +129,7 @@ struct CompletedBanner: View {
     var body: some View {
         HStack {
             Image(systemName: "checkmark.seal.fill")
-                .foregroundColor(.green)
+                .foregroundColor(WWFDesign.Colors.leafGreen)
                 .font(.title2)
             VStack(alignment: .leading) {
                 Text(LocalizationManager.shared.localizedString(for: "trail_completed"))
@@ -141,7 +141,7 @@ struct CompletedBanner: View {
             Spacer()
         }
         .padding()
-        .background(Color.green.opacity(0.1))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .background(WWFDesign.Colors.forestLight.opacity(0.1))
+        .clipShape(RoundedRectangle(cornerRadius: WWFDesign.Radius.card))
     }
 }

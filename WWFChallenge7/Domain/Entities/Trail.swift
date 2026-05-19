@@ -122,9 +122,9 @@ enum TrailDifficulty: String, Codable, CaseIterable {
 
     var color: Color {
         switch self {
-        case .easy:   return WWFStyle.Colors.green
-        case .medium: return WWFStyle.Colors.warning
-        case .hard:   return WWFStyle.Colors.danger
+        case .easy:   return WWFDesign.Colors.forestLight
+        case .medium: return Color.orange
+        case .hard:   return Color.red
         }
     }
 

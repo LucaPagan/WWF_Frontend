@@ -1,3 +1,11 @@
+//
+//  POIModalView.swift
+//  WWFChallenge7
+//
+//  Created by Luca Pagano on 06/05/26.
+//  Redesigned — Maggio 2026
+//
+
 import SwiftUI
 import _SwiftData_SwiftUI
 import SceneKit
@@ -93,30 +101,52 @@ struct POIModalView: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
+            ScrollView(showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 20) {
 
-                    // Header
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 16)
-                            .fill(accentColor.opacity(0.15))
-                            .frame(height: 120)
-                        HStack(spacing: 20) {
+                    // Premium Volcanic Header (Themed with POI accent color)
+                    ZStack(alignment: .bottomLeading) {
+                        RoundedRectangle(cornerRadius: WWFDesign.Radius.card)
+                            .fill(WWFDesign.Colors.forestDark)
+                            .frame(height: 130)
+
+                        // Pattern organico — cerchi sfumati che evocano vegetazione con colore dell'accento
+                        GeometryReader { geo in
                             ZStack {
                                 Circle()
                                     .fill(accentColor)
-                                    .frame(width: 64, height: 64)
+                                    .frame(width: 140, height: 140)
+                                    .blur(radius: 35)
+                                    .offset(x: geo.size.width * 0.65, y: -20)
+                                    .opacity(0.5)
+                            }
+                        }
+                        .clipShape(RoundedRectangle(cornerRadius: WWFDesign.Radius.card))
+
+                        HStack(spacing: 16) {
+                            ZStack {
+                                Circle()
+                                    .fill(accentColor.opacity(0.25))
+                                    .background(.ultraThinMaterial)
+                                    .overlay(
+                                        Circle().stroke(accentColor.opacity(0.4), lineWidth: 0.5)
+                                    )
+                                    .clipShape(Circle())
+                                
                                 Image(systemName: poi.type.icon)
-                                    .font(.title2)
+                                    .font(.title3)
                                     .foregroundColor(.white)
                             }
+                            .frame(width: 52, height: 52)
+                            
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(poi.localizedName)
-                                    .font(.title2)
+                                    .font(Font.custom("Georgia", size: 20).weight(.bold))
+                                    .foregroundColor(.white)
+                                
+                                Text(localizer.localizedString(for: "poi_type_" + poi.type.rawValue))
+                                    .font(WWFDesign.Typography.badge)
                                     .fontWeight(.bold)
-                                Text(poi.type.rawValue)
-                                    .font(.caption)
-                                    .fontWeight(.semibold)
                                     .foregroundColor(accentColor)
                                     .padding(.horizontal, 8)
                                     .padding(.vertical, 3)
@@ -125,9 +155,10 @@ struct POIModalView: View {
                             }
                             Spacer()
                         }
-                        .padding(.horizontal)
+                        .padding(16)
                     }
                     .padding(.horizontal)
+                    .padding(.top)
 
                     // Photo (Cover)
                     Button {
@@ -140,7 +171,7 @@ struct POIModalView: View {
                                 .scaledToFill()
                                 .frame(maxWidth: .infinity)
                                 .frame(height: 200)
-                                .clipShape(RoundedRectangle(cornerRadius: 16))
+                                .clipShape(RoundedRectangle(cornerRadius: WWFDesign.Radius.card))
                                 .padding(.horizontal)
                         } else if let urlStr = poi.photoURL {
                             SupabaseImageView(urlStr: urlStr)
@@ -149,11 +180,12 @@ struct POIModalView: View {
                     }
                     .buttonStyle(PlainButtonStyle())
 
-                    // Description
-                    VStack(alignment: .leading, spacing: 8) {
+                    // Description & Audio Reader
+                    VStack(alignment: .leading, spacing: 12) {
                         HStack {
                             Text(localizer.localizedString(for: "description"))
-                                .font(.headline)
+                                .font(WWFDesign.Typography.sectionTitle)
+                                .foregroundColor(WWFDesign.Colors.forestDark)
                             Spacer()
                             Button {
                                 if voiceService.isSpeaking {
@@ -167,10 +199,16 @@ struct POIModalView: View {
                                     .foregroundColor(accentColor)
                             }
                         }
+                        
                         Text(poi.localizedDescription)
-                            .font(.body)
+                            .font(WWFDesign.Typography.trailDesc)
                             .foregroundColor(.secondary)
+                            .lineSpacing(4)
                     }
+                    .padding(16)
+                    .background(Color(.systemBackground))
+                    .clipShape(RoundedRectangle(cornerRadius: WWFDesign.Radius.card))
+                    .shadow(color: Color.black.opacity(0.03), radius: 4, x: 0, y: 2)
                     .padding(.horizontal)
 
                     // Extra Media (Tiered Content)
@@ -181,12 +219,14 @@ struct POIModalView: View {
                     .padding(.horizontal)
 
                     // Updated Position Badge
-                    HStack {
+                    HStack(spacing: 8) {
                         Image(systemName: "location.fill.viewfinder")
-                            .foregroundColor(.green)
+                            .foregroundColor(WWFDesign.Colors.leafGreen)
+                            .font(.subheadline)
                         Text(localizer.localizedString(for: "position_updated_on_map"))
-                            .font(.caption)
-                            .foregroundColor(.green)
+                            .font(WWFDesign.Typography.metaLabel)
+                            .foregroundColor(WWFDesign.Colors.leafGreen)
+                            .fontWeight(.medium)
                     }
                     .padding(.horizontal)
 
@@ -199,14 +239,15 @@ struct POIModalView: View {
                             .foregroundColor(.white)
                             .frame(maxWidth: .infinity)
                             .padding()
-                            .background(WWFStyle.Colors.green)
-                            .clipShape(RoundedRectangle(cornerRadius: 14))
+                            .background(WWFDesign.Colors.forestMid)
+                            .clipShape(RoundedRectangle(cornerRadius: WWFDesign.Radius.card))
+                            .shadow(color: WWFDesign.Colors.forestMid.opacity(0.2), radius: 6, x: 0, y: 3)
                     }
                     .padding(.horizontal)
                     .padding(.bottom, 32)
                 }
-                .padding(.top)
             }
+            .background(Color(.systemGroupedBackground).ignoresSafeArea())
             .navigationTitle(poi.localizedName)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -214,7 +255,7 @@ struct POIModalView: View {
                     Button(localizer.localizedString(for: "close")) {
                         onContinue?() ?? dismiss()
                     }
-                    .foregroundColor(WWFStyle.Colors.green)
+                    .foregroundColor(WWFDesign.Colors.forestMid)
                 }
             }
             .fullScreenCover(isPresented: $showFullScreenGallery) {
@@ -236,7 +277,8 @@ struct POIMediaGallery: View {
         if !contents.isEmpty {
             VStack(alignment: .leading, spacing: 12) {
                 Text(LocalizationManager.shared.localizedString(for: "extra_content"))
-                    .font(.headline)
+                    .font(WWFDesign.Typography.sectionTitle)
+                    .foregroundColor(WWFDesign.Colors.forestDark)
                 
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 12) {
@@ -272,11 +314,11 @@ struct ContentThumbnailView: View {
                             .resizable()
                             .scaledToFill()
                             .frame(width: 140, height: 100)
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                            .clipShape(RoundedRectangle(cornerRadius: WWFDesign.Radius.card))
                     } else if let urlStr = content.fileURL {
                         SupabaseImageView(urlStr: urlStr)
                             .frame(width: 140, height: 100)
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                            .clipShape(RoundedRectangle(cornerRadius: WWFDesign.Radius.card))
                     } else {
                         placeholderView
                     }
@@ -285,7 +327,7 @@ struct ContentThumbnailView: View {
                 }
             }
             .overlay(
-                RoundedRectangle(cornerRadius: 12)
+                RoundedRectangle(cornerRadius: WWFDesign.Radius.card)
                     .stroke(Color.gray.opacity(0.2), lineWidth: 1)
             )
         }
@@ -299,14 +341,14 @@ struct ContentThumbnailView: View {
         VStack(spacing: 8) {
             Image(systemName: content.contentType.icon)
                 .font(.title)
-                .foregroundColor(WWFStyle.Colors.green)
+                .foregroundColor(WWFDesign.Colors.forestLight)
             Text(content.contentType.displayName)
-                .font(.caption)
+                .font(WWFDesign.Typography.metaLabel)
                 .foregroundColor(.secondary)
         }
         .frame(width: 140, height: 100)
-        .background(Color.gray.opacity(0.1))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .background(WWFDesign.Colors.forestLight.opacity(0.06))
+        .clipShape(RoundedRectangle(cornerRadius: WWFDesign.Radius.card))
     }
 }
 
@@ -564,7 +606,7 @@ struct MediaDetailView: View {
                     Button(LocalizationManager.shared.localizedString(for: "close")) {
                         dismiss()
                     }
-                    .foregroundColor(WWFStyle.Colors.green)
+                    .foregroundColor(WWFDesign.Colors.forestMid)
                 }
             }
         }
@@ -588,9 +630,9 @@ struct VideoPlayerView: View {
 
     var body: some View {
         VideoPlayer(player: AVPlayer(url: url))
-            .clipShape(RoundedRectangle(cornerRadius: 16))
+            .clipShape(RoundedRectangle(cornerRadius: WWFDesign.Radius.card))
             .overlay(
-                RoundedRectangle(cornerRadius: 16)
+                RoundedRectangle(cornerRadius: WWFDesign.Radius.card)
                     .stroke(Color.gray.opacity(0.3), lineWidth: 1)
             )
     }
@@ -609,11 +651,11 @@ struct AudioPlayerView: View {
         VStack(spacing: 24) {
             ZStack {
                 Circle()
-                    .fill(WWFStyle.Colors.green.opacity(0.1))
+                    .fill(WWFDesign.Colors.forestLight.opacity(0.1))
                     .frame(width: 120, height: 120)
                 Image(systemName: "waveform")
                     .font(.system(size: 54))
-                    .foregroundColor(WWFStyle.Colors.green)
+                    .foregroundColor(WWFDesign.Colors.forestLight)
             }
             .padding(.top)
 
@@ -634,7 +676,7 @@ struct AudioPlayerView: View {
                         }
                     }
                 }
-                .accentColor(WWFStyle.Colors.green)
+                .accentColor(WWFDesign.Colors.forestLight)
 
                 HStack {
                     Text(timeString(time: (audioPlayer?.currentTime ?? 0)))
@@ -663,13 +705,13 @@ struct AudioPlayerView: View {
             } label: {
                 Image(systemName: isPlaying ? "pause.circle.fill" : "play.circle.fill")
                     .font(.system(size: 64))
-                    .foregroundColor(WWFStyle.Colors.green)
+                    .foregroundColor(WWFDesign.Colors.forestLight)
             }
             .padding(.bottom)
         }
         .padding()
         .background(Color(.secondarySystemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 20))
+        .clipShape(RoundedRectangle(cornerRadius: WWFDesign.Radius.card))
         .shadow(color: Color.black.opacity(0.05), radius: 10, x: 0, y: 5)
         .onAppear {
             setupAudio()
@@ -724,9 +766,9 @@ struct Model3DView: View {
             options: [.allowsCameraControl, .autoenablesDefaultLighting]
         )
         .background(Color.black.opacity(0.05))
-        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .clipShape(RoundedRectangle(cornerRadius: WWFDesign.Radius.card))
         .overlay(
-            RoundedRectangle(cornerRadius: 16)
+            RoundedRectangle(cornerRadius: WWFDesign.Radius.card)
                 .stroke(Color.gray.opacity(0.3), lineWidth: 1)
         )
     }
@@ -746,7 +788,7 @@ struct SupabaseImageView: View {
                     .scaledToFill()
                     .frame(maxWidth: .infinity)
                     .frame(height: 200)
-                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                    .clipShape(RoundedRectangle(cornerRadius: WWFDesign.Radius.card))
             } else if isLoading {
                 ProgressView()
                     .frame(maxWidth: .infinity)
@@ -754,11 +796,11 @@ struct SupabaseImageView: View {
             } else {
                 Image(systemName: "photo")
                     .font(.largeTitle)
-                    .foregroundColor(.gray)
+                    .foregroundColor(WWFDesign.Colors.forestMid.opacity(0.4))
                     .frame(maxWidth: .infinity)
                     .frame(height: 200)
-                    .background(Color.gray.opacity(0.1))
-                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                    .background(WWFDesign.Colors.forestLight.opacity(0.06))
+                    .clipShape(RoundedRectangle(cornerRadius: WWFDesign.Radius.card))
             }
         }
         .task {

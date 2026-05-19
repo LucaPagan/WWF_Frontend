@@ -3,6 +3,7 @@
 //  WWFChallenge7
 //
 //  Created by Luca Pagano on 16/05/26.
+//  Redesigned — Maggio 2026
 //
 
 import SwiftUI
@@ -31,10 +32,10 @@ struct DownloadSelectionView: View {
             // Header
             VStack(spacing: 8) {
                 Text(localizer.localizedString(for: "prepare_trail"))
-                    .font(.title2)
-                    .fontWeight(.bold)
+                    .font(Font.custom("Georgia", size: 22).weight(.bold))
+                    .foregroundColor(WWFDesign.Colors.forestDark)
                 Text(localizer.localizedString(for: "download_offline_desc"))
-                    .font(.subheadline)
+                    .font(WWFDesign.Typography.trailDesc)
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
             }
@@ -44,7 +45,8 @@ struct DownloadSelectionView: View {
             // Language Selection
             VStack(alignment: .leading, spacing: 12) {
                 Text(localizer.localizedString(for: "content_language"))
-                    .font(.headline)
+                    .font(WWFDesign.Typography.trailName)
+                    .foregroundColor(WWFDesign.Colors.forestDark)
                     .padding(.horizontal)
                 
                 ScrollView(.horizontal, showsIndicators: false) {
@@ -53,18 +55,19 @@ struct DownloadSelectionView: View {
                             Button {
                                 selectedLanguage = lang.0
                             } label: {
-                                HStack {
+                                HStack(spacing: 6) {
                                     Text(lang.2)
                                     Text(lang.1)
+                                        .font(WWFDesign.Typography.metaLabel)
                                 }
-                               .padding(.horizontal, 16)
+                                .padding(.horizontal, 16)
                                 .padding(.vertical, 10)
-                                .background(selectedLanguage == lang.0 ? WWFStyle.Colors.green.opacity(0.1) : Color.gray.opacity(0.1))
-                                .foregroundColor(selectedLanguage == lang.0 ? WWFStyle.Colors.green : .primary)
+                                .background(selectedLanguage == lang.0 ? WWFDesign.Colors.forestLight.opacity(0.12) : Color.gray.opacity(0.08))
+                                .foregroundColor(selectedLanguage == lang.0 ? WWFDesign.Colors.forestDark : .primary)
                                 .clipShape(Capsule())
                                 .overlay(
                                     Capsule()
-                                        .stroke(selectedLanguage == lang.0 ? WWFStyle.Colors.green : Color.clear, lineWidth: 1)
+                                        .stroke(selectedLanguage == lang.0 ? WWFDesign.Colors.forestLight.opacity(0.4) : Color.clear, lineWidth: 1)
                                 )
                             }
                         }
@@ -77,7 +80,8 @@ struct DownloadSelectionView: View {
             // Tier Selection
             VStack(alignment: .leading, spacing: 12) {
                 Text(localizer.localizedString(for: "choose_how_much_download"))
-                    .font(.headline)
+                    .font(WWFDesign.Typography.trailName)
+                    .foregroundColor(WWFDesign.Colors.forestDark)
                     .padding(.horizontal)
                 
                 VStack(spacing: 16) {
@@ -100,9 +104,9 @@ struct DownloadSelectionView: View {
                 if downloadManager.isDownloading {
                     VStack(spacing: 12) {
                         ProgressView(value: downloadManager.progress)
-                            .tint(WWFStyle.Colors.green)
+                            .tint(WWFDesign.Colors.forestLight)
                         Text(downloadManager.currentDownloadName ?? localizer.localizedString(for: "downloading_progress"))
-                            .font(.caption)
+                            .font(WWFDesign.Typography.trailDesc)
                             .foregroundColor(.secondary)
                     }
                 } else {
@@ -121,19 +125,21 @@ struct DownloadSelectionView: View {
                             Image(systemName: isCurrentTierDownloaded ? "play.fill" : "icloud.and.arrow.down.fill")
                             Text(isCurrentTierDownloaded ? localizer.localizedString(for: "use_this_version") : localizer.localizedString(for: "download_and_start"))
                                 .fontWeight(.bold)
+                                .font(WWFDesign.Typography.trailName)
                         }
                         .frame(maxWidth: .infinity)
                         .padding()
-                        .background(WWFStyle.Colors.green)
+                        .background(WWFDesign.Colors.forestMid)
                         .foregroundColor(.white)
-                        .clipShape(RoundedRectangle(cornerRadius: 16))
-                        .shadow(color: WWFStyle.Colors.green.opacity(0.3), radius: 8, x: 0, y: 4)
+                        .clipShape(RoundedRectangle(cornerRadius: WWFDesign.Radius.card))
+                        .shadow(color: WWFDesign.Colors.forestMid.opacity(0.2), radius: 8, x: 0, y: 4)
                     }
                 }
                 
                 Button(localizer.localizedString(for: "cancel")) {
                     dismiss()
                 }
+                .font(WWFDesign.Typography.trailName)
                 .foregroundColor(.secondary)
                 .padding(.bottom, 8)
             }
@@ -153,7 +159,6 @@ struct DownloadSelectionView: View {
     }
     
     private func startDownload() async {
-        // Find or create a DownloadPackage record in local SwiftData context
         let tierRaw = selectedTier.rawValue
         let trailId = trail.id
         
@@ -189,18 +194,20 @@ struct TierSelectionRow: View {
             HStack(spacing: 16) {
                 ZStack {
                     Circle()
-                        .fill(isSelected ? WWFStyle.Colors.green : Color.gray.opacity(0.1))
+                        .fill(isSelected ? WWFDesign.Colors.forestMid : Color.gray.opacity(0.08))
                         .frame(width: 44, height: 44)
                     Image(systemName: tierIcon)
-                        .foregroundColor(isSelected ? .white : .secondary)
+                        .font(.system(size: 16))
+                        .foregroundColor(isSelected ? .white : WWFDesign.Colors.forestDark.opacity(0.65))
                 }
                 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(localizer.localizedString(for: "tier_" + tier.rawValue))
-                        .font(.headline)
-                        .foregroundColor(.primary)
+                        .font(WWFDesign.Typography.trailName)
+                        .fontWeight(.semibold)
+                        .foregroundColor(WWFDesign.Colors.forestDark)
                     Text(localizer.localizedString(for: "tier_" + tier.rawValue + "_desc"))
-                        .font(.caption)
+                        .font(WWFDesign.Typography.trailDesc)
                         .foregroundColor(.secondary)
                         .multilineTextAlignment(.leading)
                 }
@@ -209,31 +216,33 @@ struct TierSelectionRow: View {
                 
                 VStack(alignment: .trailing, spacing: 4) {
                     Text(tier.sizeLabel)
-                        .font(.caption)
+                        .font(WWFDesign.Typography.badge)
                         .fontWeight(.bold)
-                        .foregroundColor(WWFStyle.Colors.green)
+                        .foregroundColor(WWFDesign.Colors.forestLight)
                     
                     if isDownloaded {
                         Text(localizer.localizedString(for: "downloaded_chip"))
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundColor(.green)
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundColor(WWFDesign.Colors.easyText)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
-                            .background(Color.green.opacity(0.1))
+                            .background(WWFDesign.Colors.easyFill)
                             .clipShape(Capsule())
                     } else if isSelected {
                         Image(systemName: "checkmark.circle.fill")
-                            .foregroundColor(WWFStyle.Colors.green)
+                            .font(.system(size: 18))
+                            .foregroundColor(WWFDesign.Colors.forestMid)
                     }
                 }
             }
             .padding()
             .background(Color(.systemBackground))
-            .clipShape(RoundedRectangle(cornerRadius: 16))
+            .clipShape(RoundedRectangle(cornerRadius: WWFDesign.Radius.card))
             .overlay(
-                RoundedRectangle(cornerRadius: 16)
-                    .stroke(isSelected ? WWFStyle.Colors.green : Color.clear, lineWidth: 2)
+                RoundedRectangle(cornerRadius: WWFDesign.Radius.card)
+                    .stroke(isSelected ? WWFDesign.Colors.forestMid : Color.clear, lineWidth: 1.5)
             )
+            .shadow(color: Color.black.opacity(isSelected ? 0.04 : 0.01), radius: 4, x: 0, y: 2)
         }
     }
     

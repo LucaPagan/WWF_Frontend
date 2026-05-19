@@ -1,3 +1,11 @@
+//
+//  ActiveTrailView.swift
+//  WWFChallenge7
+//
+//  Created by Luca Pagano on 06/05/26.
+//  Redesigned — Maggio 2026
+//
+
 import SwiftUI
 
 // MARK: - Stato navigazione
@@ -89,10 +97,8 @@ struct ActiveTrailView: View {
 
             // ── Bottom navigation panel ───────────────────────────────────────
             VStack(spacing: 0) {
-                // Ensure ProgressBar is a valid struct in your project.
-                // Replace with ProgressView(value: progressFraction) if you don't have it.
                 ProgressView(value: progressFraction)
-                    .progressViewStyle(LinearProgressViewStyle(tint: WWFStyle.Colors.green))
+                    .tint(WWFDesign.Colors.forestLight)
                     .frame(height: 4)
 
                 VStack(spacing: 12) {
@@ -110,15 +116,28 @@ struct ActiveTrailView: View {
         // ── Top-leading controls ──────────────────────────────────────────────
         .overlay(alignment: .topLeading) {
             VStack(spacing: 16) {
+                // Dimissione vetrosa organica
                 Button { dismiss() } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.title)
-                        .foregroundStyle(.white, Color.black.opacity(0.4))
+                    ZStack {
+                        Circle()
+                            .fill(WWFDesign.Colors.forestMid.opacity(0.35))
+                            .background(.ultraThinMaterial)
+                            .overlay(
+                                Circle().stroke(WWFDesign.Colors.leafGreen.opacity(0.35), lineWidth: 0.5)
+                            )
+                            .clipShape(Circle())
+                        
+                        Image(systemName: "xmark")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(WWFDesign.Colors.leafLight)
+                    }
+                    .frame(width: 40, height: 40)
                 }
+                .padding(.top, 44) // Posizionamento sotto notch
 
                 mapSwitcherMenu
             }
-            .padding()
+            .padding(.horizontal)
         }
         // ── Progress label ───────────────────────────────────────────────────
         .overlay(alignment: .topTrailing) {
@@ -130,7 +149,7 @@ struct ActiveTrailView: View {
                 .padding(.vertical, 5)
                 .background(Color.black.opacity(0.4))
                 .clipShape(Capsule())
-                .padding(.top, 16)
+                .padding(.top, 60) // Allineato al pulsante a sinistra
                 .padding(.trailing, 16)
         }
         // ── Sheets / Alerts ───────────────────────────────────────────────────
@@ -200,14 +219,19 @@ struct ActiveTrailView: View {
         } label: {
             ZStack {
                 Circle()
-                    .fill(Color.black.opacity(0.4))
-                    .frame(width: 44, height: 44)
+                    .fill(WWFDesign.Colors.forestMid.opacity(0.35))
+                    .background(.ultraThinMaterial)
+                    .overlay(
+                        Circle().stroke(WWFDesign.Colors.leafGreen.opacity(0.35), lineWidth: 0.5)
+                    )
+                    .clipShape(Circle())
+                
                 Image(systemName: mapIconName)
-                    .font(.title2)
-                    .foregroundColor(.white)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(WWFDesign.Colors.leafLight)
             }
+            .frame(width: 40, height: 40)
         }
-        .padding(.top, 4)
     }
 
     private var mapIconName: String {
@@ -253,8 +277,9 @@ struct ActiveTrailView: View {
                     .foregroundColor(.white)
                     .frame(maxWidth: .infinity)
                     .padding()
-                    .background(WWFStyle.Colors.green)
-                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                    .background(WWFDesign.Colors.forestMid)
+                    .clipShape(RoundedRectangle(cornerRadius: WWFDesign.Radius.card))
+                    .shadow(color: WWFDesign.Colors.forestMid.opacity(0.2), radius: 6, x: 0, y: 3)
             }
 
         case .navigatingTo:
@@ -264,8 +289,9 @@ struct ActiveTrailView: View {
                     .foregroundColor(.white)
                     .frame(maxWidth: .infinity)
                     .padding()
-                    .background(WWFStyle.Colors.green)
-                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                    .background(WWFDesign.Colors.forestMid)
+                    .clipShape(RoundedRectangle(cornerRadius: WWFDesign.Radius.card))
+                    .shadow(color: WWFDesign.Colors.forestMid.opacity(0.2), radius: 6, x: 0, y: 3)
             }
 
         case .poiReached:
@@ -278,8 +304,9 @@ struct ActiveTrailView: View {
                     .foregroundColor(.white)
                     .frame(maxWidth: .infinity)
                     .padding()
-                    .background(WWFStyle.Colors.darkGreen)
-                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                    .background(WWFDesign.Colors.forestDark)
+                    .clipShape(RoundedRectangle(cornerRadius: WWFDesign.Radius.card))
+                    .shadow(color: WWFDesign.Colors.forestDark.opacity(0.25), radius: 6, x: 0, y: 3)
             }
         }
     }
@@ -352,11 +379,14 @@ struct StartPointCard: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 10) {
                 ZStack {
-                    Circle().fill(WWFStyle.Colors.green).frame(width: 36, height: 36)
+                    Circle().fill(WWFDesign.Colors.forestLight).frame(width: 36, height: 36)
                     Image(systemName: "flag.fill").font(.caption).foregroundColor(.white)
                 }
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("\(LocalizationManager.shared.localizedString(for: "you_are_here")): \(name)").font(.subheadline).fontWeight(.bold)
+                    Text("\(LocalizationManager.shared.localizedString(for: "you_are_here")): \(name)")
+                        .font(.subheadline)
+                        .fontWeight(.bold)
+                        .foregroundColor(WWFDesign.Colors.forestDark)
                     Text(description).font(.caption).foregroundColor(.secondary).lineLimit(2)
                 }
             }
@@ -364,14 +394,14 @@ struct StartPointCard: View {
                 Divider()
                 HStack(spacing: 8) {
                     Image(systemName: "arrow.turn.up.right")
-                        .foregroundColor(WWFStyle.Colors.green).font(.caption)
+                        .foregroundColor(WWFDesign.Colors.forestLight).font(.caption)
                     Text(instructions).font(.caption).foregroundColor(.secondary).lineLimit(3)
                 }
             }
         }
         .padding()
-        .background(WWFStyle.Colors.green.opacity(0.08))
-        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .background(WWFDesign.Colors.forestLight.opacity(0.08))
+        .clipShape(RoundedRectangle(cornerRadius: WWFDesign.Radius.card))
     }
 }
 
@@ -390,7 +420,10 @@ struct NavigatingCard: View {
                 }
                 VStack(alignment: .leading, spacing: 2) {
                     if let poi = step.poi {
-                        Text("\(LocalizationManager.shared.localizedString(for: "go_to")): \(poi.localizedName)").font(.subheadline).fontWeight(.bold)
+                        Text("\(LocalizationManager.shared.localizedString(for: "go_to")): \(poi.localizedName)")
+                            .font(.subheadline)
+                            .fontWeight(.bold)
+                            .foregroundColor(WWFDesign.Colors.forestDark)
                     }
                     Text(LocalizationManager.shared.localizedString(for: "scan_qr_desc")).font(.caption).foregroundColor(.secondary)
                 }
@@ -404,7 +437,7 @@ struct NavigatingCard: View {
         }
         .padding()
         .background(Color.orange.opacity(0.08))
-        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .clipShape(RoundedRectangle(cornerRadius: WWFDesign.Radius.card))
     }
 }
 
@@ -416,37 +449,20 @@ struct POIReachedCard: View {
     var body: some View {
         HStack(spacing: 12) {
             ZStack {
-                Circle().fill(Color.green).frame(width: 36, height: 36)
+                Circle().fill(WWFDesign.Colors.leafGreen).frame(width: 36, height: 36)
                 Image(systemName: "checkmark").font(.caption).fontWeight(.bold).foregroundColor(.white)
             }
             VStack(alignment: .leading, spacing: 2) {
-                Text("\(LocalizationManager.shared.localizedString(for: "reached")): \(poi.localizedName)").font(.subheadline).fontWeight(.bold)
+                Text("\(LocalizationManager.shared.localizedString(for: "reached")): \(poi.localizedName)")
+                    .font(.subheadline)
+                    .fontWeight(.bold)
+                    .foregroundColor(WWFDesign.Colors.forestDark)
                 Text(LocalizationManager.shared.localizedString(for: "view_info")).font(.caption).foregroundColor(.secondary)
             }
             Spacer()
         }
         .padding()
-        .background(Color.green.opacity(0.08))
-        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .background(WWFDesign.Colors.leafGreen.opacity(0.08))
+        .clipShape(RoundedRectangle(cornerRadius: WWFDesign.Radius.card))
     }
 }
-
-// MARK: - CompletedBanner (Mock for component)
-/*struct CompletedBanner: View {
-    var body: some View {
-        HStack(spacing: 12) {
-            ZStack {
-                Circle().fill(Color.blue).frame(width: 36, height: 36)
-                Image(systemName: "star.fill").font(.caption).fontWeight(.bold).foregroundColor(.white)
-            }
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Trail Completed!").font(.subheadline).fontWeight(.bold)
-                Text("Great job navigating the trail.").font(.caption).foregroundColor(.secondary)
-            }
-            Spacer()
-        }
-        .padding()
-        .background(Color.blue.opacity(0.08))
-        .clipShape(RoundedRectangle(cornerRadius: 14))
-    }
-}*/

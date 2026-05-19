@@ -183,13 +183,13 @@ enum EventCategory: String, Codable, CaseIterable {
 
     var color: Color {
         switch self {
-        case .educational:  return WWFStyle.Colors.educational
-        case .guidedTour:   return WWFStyle.Colors.green
-        case .workshop:     return WWFStyle.Colors.workshop
-        case .family:       return WWFStyle.Colors.family
-        case .photography:  return WWFStyle.Colors.photography
-        case .scientific:   return WWFStyle.Colors.scientific
-        case .other:        return WWFStyle.Colors.other
+        case .educational:  return Color.blue
+        case .guidedTour:   return WWFDesign.Colors.forestLight
+        case .workshop:     return Color.orange
+        case .family:       return Color.purple
+        case .photography:  return Color.gray
+        case .scientific:   return Color.teal
+        case .other:        return WWFDesign.Colors.leafGreen
         }
     }
 

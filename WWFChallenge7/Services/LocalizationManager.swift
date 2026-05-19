@@ -13,19 +13,17 @@ import Combine
 final class LocalizationManager: ObservableObject {
     static let shared = LocalizationManager()
     
-    var preferredLanguage: String {
-        get { UserDefaults.standard.string(forKey: "preferredLanguage") ?? "it" }
-        set { 
-            UserDefaults.standard.set(newValue, forKey: "preferredLanguage")
-            Task { @MainActor in
-                self.objectWillChange.send()
-            }
+    @Published var preferredLanguage: String {
+        didSet {
+            UserDefaults.standard.set(preferredLanguage, forKey: "preferredLanguage")
         }
     }
     
     private var modelContainer: ModelContainer?
     
-    private init() {}
+    private init() {
+        self.preferredLanguage = UserDefaults.standard.string(forKey: "preferredLanguage") ?? "it"
+    }
     
     func configure(with container: ModelContainer) {
         self.modelContainer = container
@@ -746,6 +744,36 @@ final class LocalizationManager: ObservableObject {
             "en": "Great job navigating the trail.",
             "de": "Gute Arbeit beim Navigieren des Weges.",
             "fr": "Excellent travail pour parcourir le sentier."
+        ],
+        "oasi_hours": [
+            "it": "Oasi aperta · 9:00 – 17:00",
+            "en": "Oasis open · 9:00 AM – 5:00 PM",
+            "de": "Oase geöffnet · 9:00 – 17:00 Uhr",
+            "fr": "Oasis ouverte · 9h00 – 17h00"
+        ],
+        "local_map": [
+            "it": "Mappa locale",
+            "en": "Local Map",
+            "de": "Lokale Karte",
+            "fr": "Carte locale"
+        ],
+        "oasi_subtitle": [
+            "it": "Riserva Naturale Vulcanica · Agnano, Napoli",
+            "en": "Volcanic Nature Reserve · Agnano, Naples",
+            "de": "Vulkanisches Naturschutzgebiet · Agnano, Neapel",
+            "fr": "Réserve Naturelle Volcanique · Agnano, Naples"
+        ],
+        "danger_label": [
+            "it": "Pericolo",
+            "en": "Danger",
+            "de": "Gefahr",
+            "fr": "Danger"
+        ],
+        "warning_label": [
+            "it": "Avviso",
+            "en": "Warning",
+            "de": "Warnung",
+            "fr": "Avertissement"
         ]
     ]
     
@@ -765,11 +793,12 @@ final class LocalizationManager: ObservableObject {
         
         let descriptor = FetchDescriptor<LocalTranslation>(
             predicate: #Predicate<LocalTranslation> {
-                $0.tableName == table && $0.recordId == recordId && $0.fieldName == fieldName && $0.languageCode == lang
+                $0.tableName == table && $0.fieldName == fieldName && $0.languageCode == lang
             }
         )
         
-        if let match = (try? context.fetch(descriptor))?.first {
+        if let matches = try? context.fetch(descriptor),
+           let match = matches.first(where: { $0.recordId == recordId }) {
             return match.translatedText
         }
         
