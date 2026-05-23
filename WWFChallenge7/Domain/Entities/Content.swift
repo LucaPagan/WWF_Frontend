@@ -20,6 +20,13 @@ final class Content {
     var sortOrder: Int
     var createdAt: Date
     var updatedAt: Date
+    var altText: String?
+    var durationSeconds: Int?
+    var languageCode: String
+    var transcriptText: String?
+    var hasEasyRead: Bool
+    var descriptionKids: String?
+    var subtitleURL: String?
 
     @Transient var contentType: ContentType {
         get { ContentType(rawValue: typeRawValue) ?? .text }
@@ -38,6 +45,13 @@ final class Content {
         data: Data? = nil,
         fileURL: String? = nil,
         sortOrder: Int = 0,
+        altText: String? = nil,
+        durationSeconds: Int? = nil,
+        languageCode: String = "it",
+        transcriptText: String? = nil,
+        hasEasyRead: Bool = false,
+        descriptionKids: String? = nil,
+        subtitleURL: String? = nil,
         fixedID: UUID? = nil
     ) {
         self.id = fixedID ?? UUID()
@@ -47,6 +61,13 @@ final class Content {
         self.data = data
         self.fileURL = fileURL
         self.sortOrder = sortOrder
+        self.altText = altText
+        self.durationSeconds = durationSeconds
+        self.languageCode = languageCode
+        self.transcriptText = transcriptText
+        self.hasEasyRead = hasEasyRead
+        self.descriptionKids = descriptionKids
+        self.subtitleURL = subtitleURL
         self.createdAt = Date()
         self.updatedAt = Date()
     }
@@ -56,6 +77,13 @@ final class Content {
         if let ti = remoteData["tier"] as? String { tierRawValue = ti }
         fileURL = remoteData["file_url"] as? String
         if let so = remoteData["sort_order"] as? Int { sortOrder = so }
+        altText = remoteData["alt_text"] as? String
+        durationSeconds = remoteData["duration_seconds"] as? Int
+        if let lang = remoteData["language_code"] as? String { languageCode = lang }
+        transcriptText = remoteData["transcript_text"] as? String
+        if let e2r = remoteData["has_easy_read"] as? Bool { hasEasyRead = e2r }
+        descriptionKids = remoteData["description_kids"] as? String
+        subtitleURL = remoteData["subtitle_url"] as? String
         // jsonb data field is stored as serialised Data if present
         if let jsonObj = remoteData["data"], !(jsonObj is NSNull) {
             if JSONSerialization.isValidJSONObject(jsonObj) {
@@ -77,24 +105,27 @@ enum ContentType: String, Codable, CaseIterable {
     case video    = "video"
     case model3d  = "model_3d"
     case audio    = "audio"
+    case transcript = "transcript"
 
     var displayName: String {
         switch self {
-        case .text:    return "Testo"
-        case .image:   return "Immagine"
-        case .video:   return "Video"
-        case .model3d: return "Modello 3D"
-        case .audio:   return "Audio"
+        case .text:       return "Testo"
+        case .image:      return "Immagine"
+        case .video:      return "Video"
+        case .model3d:    return "Modello 3D"
+        case .audio:      return "Audio"
+        case .transcript: return "Trascrizione"
         }
     }
 
     var icon: String {
         switch self {
-        case .text:    return "doc.text.fill"
-        case .image:   return "photo.fill"
-        case .video:   return "play.rectangle.fill"
-        case .model3d: return "cube.fill"
-        case .audio:   return "waveform.circle.fill"
+        case .text:       return "doc.text.fill"
+        case .image:      return "photo.fill"
+        case .video:      return "play.rectangle.fill"
+        case .model3d:    return "cube.fill"
+        case .audio:      return "waveform.circle.fill"
+        case .transcript: return "text.quote"
         }
     }
 }
@@ -137,6 +168,7 @@ extension Content {
             case .audio: ext = "mp3"
             case .model3d: ext = "usdz"
             case .text: ext = "json"
+            case .transcript: ext = "txt"
             }
         }
         return "media/\(id.uuidString).\(ext)"
@@ -174,6 +206,27 @@ extension Content {
         }
         if let rawString = String(data: data, encoding: .utf8) {
             return rawString
+        }
+        return nil
+    }
+
+    /// Extracts Easy-to-Read (E2R) text from the JSONB data field.
+    /// Expected JSONB structure: {"easy_read_text": {"it": "...", "en": "..."}}
+    func easyReadText(forLanguage lang: String = "it") -> String? {
+        guard hasEasyRead, let data = data else { return nil }
+        guard let dict = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let e2rDict = dict["easy_read_text"] as? [String: String] else { return nil }
+        return e2rDict[lang] ?? e2rDict["it"] ?? e2rDict.values.first
+    }
+
+    /// Returns the most appropriate text variant based on accessibility mode flags.
+    /// - Kids mode takes priority; falls back to easy-read; returns nil if neither applies.
+    func adaptiveText(kidsMode: Bool, easyReadMode: Bool, language: String = "it") -> String? {
+        if kidsMode, let kids = descriptionKids {
+            return kids
+        }
+        if easyReadMode {
+            return easyReadText(forLanguage: language)
         }
         return nil
     }

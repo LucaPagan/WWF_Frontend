@@ -34,7 +34,7 @@ struct EventListView: View {
                             HStack(spacing: 8) {
                                 Image(systemName: "sparkles")
                                     .foregroundColor(.orange)
-                                    .font(.system(size: 16, weight: .bold))
+                                    .font(.body.weight(.bold))
                                 Text(localizer.localizedString(for: "today_oasis"))
                                     .font(WWFDesign.Typography.sectionTitle)
                                     .foregroundColor(WWFDesign.Colors.forestDark)
@@ -100,7 +100,7 @@ struct EventsHeaderView: View {
             // Sfondo scuro cenere vulcanica / tramonto caldo
             RoundedRectangle(cornerRadius: WWFDesign.Radius.hero)
                 .fill(Color(red: 0.184, green: 0.110, blue: 0.102))
-                .frame(height: 190)
+                .frame(minHeight: 190)
 
             // Pattern organico — cerchi sfumati vulcanici caldi
             GeometryReader { geo in
@@ -128,6 +128,7 @@ struct EventsHeaderView: View {
                 .foregroundColor(Color(red: 0.949, green: 0.600, blue: 0.290).opacity(0.07))
                 .rotationEffect(.degrees(-15))
                 .offset(x: geoSizeOffsetForEvents(), y: -20)
+                .accessibilityHidden(true)
 
             // Contenuto
             VStack(alignment: .leading, spacing: 8) {
@@ -161,7 +162,7 @@ struct EventsHeaderView: View {
                     .foregroundColor(.white.opacity(0.85))
             }
             .padding(20)
-            .frame(height: 190, alignment: .leading)
+            .frame(minHeight: 190, alignment: .leading)
         }
         .clipShape(RoundedRectangle(cornerRadius: WWFDesign.Radius.hero))
     }
@@ -195,7 +196,7 @@ struct EventCardView: View {
                     // Category Badge
                     HStack(spacing: 4) {
                         Image(systemName: event.category.icon)
-                            .font(.system(size: 10, weight: .bold))
+                            .font(.caption2.weight(.bold))
                         Text(localizer.localizedString(for: "event_cat_" + event.category.rawValue))
                             .font(WWFDesign.Typography.badge)
                             .fontWeight(.bold)
@@ -213,7 +214,7 @@ struct EventCardView: View {
 
                     if event.isToday {
                         Text(localizer.localizedString(for: "today_upper"))
-                            .font(.system(size: 9, weight: .black))
+                            .font(.caption2.weight(.black))
                             .foregroundColor(.white)
                             .padding(.horizontal, 8)
                             .padding(.vertical, 4)
@@ -266,7 +267,7 @@ struct EventCardView: View {
                 if let trail = event.trail {
                     HStack(spacing: 6) {
                         Image(systemName: "signpost.right.and.left.fill")
-                            .font(.system(size: 9))
+                            .font(.caption2)
                             .foregroundColor(WWFDesign.Colors.forestMid)
                         Text("\(localizer.localizedString(for: "associated_trail")): \(trail.localizedName)")
                             .font(WWFDesign.Typography.metaLabel)
@@ -291,5 +292,9 @@ struct EventCardView: View {
             RoundedRectangle(cornerRadius: WWFDesign.Radius.card)
                 .stroke(isHighlighted ? Color.orange.opacity(0.3) : Color.clear, lineWidth: 1.5)
         )
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(event.localizedName). \(event.localizedDescription). \(event.formattedDate), \(event.formattedTimeRange). \(event.price > 0 ? String(format: "%.2f euro", event.price) : "Ingresso gratuito")")
+        .accessibilityHint("Tocca due volte per i dettagli dell'evento")
+        .accessibilityAddTraits(.isButton)
     }
 }

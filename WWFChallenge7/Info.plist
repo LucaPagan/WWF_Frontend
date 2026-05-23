@@ -6,5 +6,9 @@
 	<string>Seleziona una foto da associare al punto di interesse.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Scatta una foto da associare al punto di interesse.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>audio</string>
+	</array>
 </dict>
 </plist>

@@ -13,25 +13,28 @@ struct VisitorRootView: View {
     @ObservedObject private var localizer = LocalizationManager.shared
 
     var body: some View {
-        TabView(selection: $selectedTab) {
-            DashboardView()
-                .tabItem {
-                    Label(localizer.localizedString(for: "explore"), systemImage: "map.fill")
+        ZStack {
+            // Main content based on selected tab
+            Group {
+                switch selectedTab {
+                case 0:
+                    DashboardView()
+                case 1:
+                    EventListView()
+                case 2:
+                    ProfileView()
+                default:
+                    DashboardView()
                 }
-                .tag(0)
-
-            EventListView()
-                .tabItem {
-                    Label(localizer.localizedString(for: "events"), systemImage: "calendar.badge.clock")
-                }
-                .tag(1)
-
-            ProfileView()
-                .tabItem {
-                    Label(localizer.localizedString(for: "profile"), systemImage: "person.fill")
-                }
-                .tag(2)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            
+            // Custom Tab Bar over the content
+            VStack {
+                Spacer()
+                CustomTabBar(selectedTab: $selectedTab)
+            }
         }
-        .accentColor(WWFDesign.Colors.forestLight)
+        .ignoresSafeArea(.all, edges: .bottom)
     }
 }

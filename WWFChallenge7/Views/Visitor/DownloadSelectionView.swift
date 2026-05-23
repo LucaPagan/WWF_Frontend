@@ -11,6 +11,7 @@ import SwiftData
 
 struct DownloadSelectionView: View {
     let trail: Trail
+    var onDownloadComplete: (() -> Void)? = nil
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var downloadManager: DownloadManager
     @Environment(\.modelContext) private var modelContext
@@ -29,158 +30,194 @@ struct DownloadSelectionView: View {
     
     var body: some View {
         VStack(spacing: 0) {
-            // Header
-            VStack(spacing: 8) {
-                Text(localizer.localizedString(for: "prepare_trail"))
-                    .font(Font.custom("Georgia", size: 22).weight(.bold))
-                    .foregroundColor(WWFDesign.Colors.forestDark)
-                Text(localizer.localizedString(for: "download_offline_desc"))
-                    .font(WWFDesign.Typography.trailDesc)
-                    .foregroundColor(.secondary)
-                    .multilineTextAlignment(.center)
-            }
-            .padding(.top, 32)
-            .padding(.horizontal)
-            
-            // Language Selection
-            VStack(alignment: .leading, spacing: 12) {
-                Text(localizer.localizedString(for: "content_language"))
-                    .font(WWFDesign.Typography.trailName)
-                    .foregroundColor(WWFDesign.Colors.forestDark)
+            // Drag indicator (simulated for better spacing)
+            Capsule()
+                .fill(Color.secondary.opacity(0.3))
+                .frame(width: 40, height: 5)
+                .padding(.top, 10)
+                .accessibilityHidden(true)
+
+            ScrollView {
+                VStack(spacing: 0) {
+                    // Header
+                    VStack(spacing: 8) {
+                        Text(localizer.localizedString(for: "prepare_trail"))
+                            .font(Font.custom("Georgia", size: 24, relativeTo: .title).weight(.bold))
+                            .foregroundColor(WWFDesign.Colors.forestDark)
+                        Text(localizer.localizedString(for: "download_offline_desc"))
+                            .font(WWFDesign.Typography.trailDesc)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                    }
+                    .padding(.top, 24)
                     .padding(.horizontal)
-                
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 12) {
-                        ForEach(languages, id: \.0) { lang in
-                            Button {
-                                selectedLanguage = lang.0
-                            } label: {
-                                HStack(spacing: 6) {
-                                    Text(lang.2)
-                                    Text(lang.1)
-                                        .font(WWFDesign.Typography.metaLabel)
+                    .accessibilityElement(children: .combine)
+                    
+                    // Language Selection
+                    VStack(alignment: .leading, spacing: 16) {
+                        Text(localizer.localizedString(for: "content_language"))
+                            .font(WWFDesign.Typography.trailName)
+                            .foregroundColor(WWFDesign.Colors.forestDark)
+                            .padding(.horizontal)
+                        
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 12) {
+                                ForEach(languages, id: \.0) { lang in
+                                    Button {
+                                        selectedLanguage = lang.0
+                                    } label: {
+                                        HStack(spacing: 6) {
+                                            Text(lang.2)
+                                                .accessibilityHidden(true)
+                                            Text(lang.1)
+                                                .font(WWFDesign.Typography.metaLabel)
+                                        }
+                                        .padding(.horizontal, 16)
+                                        .padding(.vertical, 12)
+                                        .background(selectedLanguage == lang.0 ? WWFDesign.Colors.easyFill : Color.gray.opacity(0.08))
+                                        .foregroundColor(selectedLanguage == lang.0 ? WWFDesign.Colors.easyText : .primary)
+                                        .clipShape(Capsule())
+                                        .overlay(
+                                            Capsule()
+                                                .stroke(selectedLanguage == lang.0 ? WWFDesign.Colors.forestLight.opacity(0.4) : Color.clear, lineWidth: 1)
+                                        )
+                                    }
+                                    .accessibilityLabel("Lingua \(lang.1)")
+                                    .accessibilityAddTraits(selectedLanguage == lang.0 ? [.isSelected] : [])
                                 }
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 10)
-                                .background(selectedLanguage == lang.0 ? WWFDesign.Colors.forestLight.opacity(0.12) : Color.gray.opacity(0.08))
-                                .foregroundColor(selectedLanguage == lang.0 ? WWFDesign.Colors.forestDark : .primary)
-                                .clipShape(Capsule())
-                                .overlay(
-                                    Capsule()
-                                        .stroke(selectedLanguage == lang.0 ? WWFDesign.Colors.forestLight.opacity(0.4) : Color.clear, lineWidth: 1)
+                            }
+                            .padding(.horizontal)
+                        }
+                    }
+                    .padding(.vertical, 24)
+                    
+                    // Tier Selection
+                    VStack(alignment: .leading, spacing: 16) {
+                        Text(localizer.localizedString(for: "choose_how_much_download"))
+                            .font(WWFDesign.Typography.trailName)
+                            .foregroundColor(WWFDesign.Colors.forestDark)
+                            .padding(.horizontal)
+                        
+                        VStack(spacing: 16) {
+                            ForEach(ContentTier.allCases, id: \.self) { tier in
+                                TierSelectionRow(
+                                    tier: tier,
+                                    isSelected: selectedTier == tier,
+                                    isDownloaded: downloadedTiers.contains(tier),
+                                    onSelect: { selectedTier = tier }
                                 )
                             }
                         }
+                        .padding(.horizontal)
                     }
-                    .padding(.horizontal)
                 }
-            }
-            .padding(.vertical, 24)
-            
-            // Tier Selection
-            VStack(alignment: .leading, spacing: 12) {
-                Text(localizer.localizedString(for: "choose_how_much_download"))
-                    .font(WWFDesign.Typography.trailName)
-                    .foregroundColor(WWFDesign.Colors.forestDark)
-                    .padding(.horizontal)
                 
+                // Action Button
                 VStack(spacing: 16) {
-                    ForEach(ContentTier.allCases, id: \.self) { tier in
-                        TierSelectionRow(
-                            tier: tier,
-                            isSelected: selectedTier == tier,
-                            isDownloaded: downloadedTiers.contains(tier),
-                            onSelect: { selectedTier = tier }
-                        )
+                    if downloadManager.isDownloading {
+                        VStack(spacing: 12) {
+                            ProgressView(value: downloadManager.progress)
+                                .tint(WWFDesign.Colors.forestLight)
+                            Text(downloadManager.currentDownloadName ?? localizer.localizedString(for: "downloading_progress"))
+                                .font(WWFDesign.Typography.trailDesc)
+                                .foregroundColor(.secondary)
+                        }
+                    } else {
+                        let isCurrentTierDownloaded = downloadedTiers.contains(selectedTier)
+                        
+                        Button {
+                            if isCurrentTierDownloaded {
+                                onDownloadComplete?()
+                                if onDownloadComplete == nil {
+                                    dismiss()
+                                }
+                            } else {
+                                Task {
+                                    await startDownload()
+                                }
+                            }
+                        } label: {
+                            HStack {
+                                Image(systemName: isCurrentTierDownloaded ? "play.fill" : "icloud.and.arrow.down.fill")
+                                Text(isCurrentTierDownloaded ? localizer.localizedString(for: "use_this_version") : localizer.localizedString(for: "download_and_start"))
+                                    .fontWeight(.bold)
+                                    .font(WWFDesign.Typography.trailName)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(WWFDesign.Colors.forestMid)
+                            .foregroundColor(.white)
+                            .clipShape(RoundedRectangle(cornerRadius: WWFDesign.Radius.card))
+                            .shadow(color: WWFDesign.Colors.forestMid.opacity(0.2), radius: 8, x: 0, y: 4)
+                        }
+                        .accessibilityLabel(isCurrentTierDownloaded ? "Usa questa versione e inizia" : "Scarica e inizia")
+                        .accessibilityHint("Avvia il percorso con il livello di download selezionato")
                     }
+                    
+                    Button(localizer.localizedString(for: "cancel")) {
+                        dismiss()
+                    }
+                    .font(WWFDesign.Typography.trailName)
+                    .foregroundColor(.secondary)
+                    .frame(minHeight: 44)
+                    .padding(.bottom, 8)
+                    .accessibilityLabel("Annulla")
+                    .accessibilityHint("Chiudi senza scaricare")
                 }
-                .padding(.horizontal)
+                .padding(24)
+            }
+        }
+        .background(Color(.systemGroupedBackground).ignoresSafeArea())
+        .overlay(alignment: .topTrailing) {
+            Button {
+                dismiss()
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.title2)
+                    .foregroundColor(Color.secondary.opacity(0.7))
+                    .padding(16)
+                    .background(Color.white.opacity(0.001)) // Increase touch target
+            }
+            .accessibilityLabel("Chiudi schermata")
+        }
+    }
+        
+    private var downloadedTiers: Set<ContentTier> {
+            let trailId = trail.id
+            let descriptor = FetchDescriptor<DownloadPackage>(
+                predicate: #Predicate<DownloadPackage> { $0.pathId == trailId && $0.isReady == true }
+            )
+            let packages = (try? modelContext.fetch(descriptor)) ?? []
+            return Set(packages.filter { $0.isDownloaded }.map { $0.tier })
+        }
+        
+        
+        private func startDownload() async {
+            let tierRaw = selectedTier.rawValue
+            let trailId = trail.id
+            
+            let descriptor = FetchDescriptor<DownloadPackage>(
+                predicate: #Predicate<DownloadPackage> { $0.pathId == trailId && $0.tierRawValue == tierRaw }
+            )
+            
+            let pkg: DownloadPackage
+            if let existing = try? modelContext.fetch(descriptor).first {
+                pkg = existing
+            } else {
+                pkg = DownloadPackage(pathId: trailId, tier: selectedTier, isReady: true)
+                modelContext.insert(pkg)
             }
             
-            Spacer()
+            await downloadManager.downloadPackage(pkg, language: selectedLanguage)
             
-            // Action Button
-            VStack(spacing: 16) {
-                if downloadManager.isDownloading {
-                    VStack(spacing: 12) {
-                        ProgressView(value: downloadManager.progress)
-                            .tint(WWFDesign.Colors.forestLight)
-                        Text(downloadManager.currentDownloadName ?? localizer.localizedString(for: "downloading_progress"))
-                            .font(WWFDesign.Typography.trailDesc)
-                            .foregroundColor(.secondary)
-                    }
-                } else {
-                    let isCurrentTierDownloaded = downloadedTiers.contains(selectedTier)
-                    
-                    Button {
-                        if isCurrentTierDownloaded {
-                            dismiss()
-                        } else {
-                            Task {
-                                await startDownload()
-                            }
-                        }
-                    } label: {
-                        HStack {
-                            Image(systemName: isCurrentTierDownloaded ? "play.fill" : "icloud.and.arrow.down.fill")
-                            Text(isCurrentTierDownloaded ? localizer.localizedString(for: "use_this_version") : localizer.localizedString(for: "download_and_start"))
-                                .fontWeight(.bold)
-                                .font(WWFDesign.Typography.trailName)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(WWFDesign.Colors.forestMid)
-                        .foregroundColor(.white)
-                        .clipShape(RoundedRectangle(cornerRadius: WWFDesign.Radius.card))
-                        .shadow(color: WWFDesign.Colors.forestMid.opacity(0.2), radius: 8, x: 0, y: 4)
-                    }
-                }
-                
-                Button(localizer.localizedString(for: "cancel")) {
+            if downloadManager.error == nil {
+                onDownloadComplete?()
+                if onDownloadComplete == nil {
                     dismiss()
                 }
-                .font(WWFDesign.Typography.trailName)
-                .foregroundColor(.secondary)
-                .padding(.bottom, 8)
             }
-            .padding(24)
-            .background(Color(.systemBackground))
-        }
-        .background(Color(.systemGroupedBackground))
-    }
-    
-    private var downloadedTiers: Set<ContentTier> {
-        let trailId = trail.id
-        let descriptor = FetchDescriptor<DownloadPackage>(
-            predicate: #Predicate<DownloadPackage> { $0.pathId == trailId && $0.isReady == true }
-        )
-        let packages = (try? modelContext.fetch(descriptor)) ?? []
-        return Set(packages.filter { $0.isDownloaded }.map { $0.tier })
-    }
-    
-    private func startDownload() async {
-        let tierRaw = selectedTier.rawValue
-        let trailId = trail.id
-        
-        let descriptor = FetchDescriptor<DownloadPackage>(
-            predicate: #Predicate<DownloadPackage> { $0.pathId == trailId && $0.tierRawValue == tierRaw }
-        )
-        
-        let pkg: DownloadPackage
-        if let existing = try? modelContext.fetch(descriptor).first {
-            pkg = existing
-        } else {
-            pkg = DownloadPackage(pathId: trailId, tier: selectedTier, isReady: true)
-            modelContext.insert(pkg)
-        }
-        
-        await downloadManager.downloadPackage(pkg, language: selectedLanguage)
-        
-        if downloadManager.error == nil {
-            dismiss()
         }
     }
-}
 
 struct TierSelectionRow: View {
     let tier: ContentTier
@@ -191,13 +228,13 @@ struct TierSelectionRow: View {
     
     var body: some View {
         Button(action: onSelect) {
-            HStack(spacing: 16) {
+            HStack(alignment: .top, spacing: 16) {
                 ZStack {
                     Circle()
                         .fill(isSelected ? WWFDesign.Colors.forestMid : Color.gray.opacity(0.08))
                         .frame(width: 44, height: 44)
                     Image(systemName: tierIcon)
-                        .font(.system(size: 16))
+                        .font(.body)
                         .foregroundColor(isSelected ? .white : WWFDesign.Colors.forestDark.opacity(0.65))
                 }
                 
@@ -206,10 +243,12 @@ struct TierSelectionRow: View {
                         .font(WWFDesign.Typography.trailName)
                         .fontWeight(.semibold)
                         .foregroundColor(WWFDesign.Colors.forestDark)
+                        .fixedSize(horizontal: false, vertical: true)
                     Text(localizer.localizedString(for: "tier_" + tier.rawValue + "_desc"))
                         .font(WWFDesign.Typography.trailDesc)
                         .foregroundColor(.secondary)
                         .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 
                 Spacer()
@@ -222,7 +261,7 @@ struct TierSelectionRow: View {
                     
                     if isDownloaded {
                         Text(localizer.localizedString(for: "downloaded_chip"))
-                            .font(.system(size: 9, weight: .bold))
+                            .font(.caption2.weight(.bold))
                             .foregroundColor(WWFDesign.Colors.easyText)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
@@ -230,7 +269,7 @@ struct TierSelectionRow: View {
                             .clipShape(Capsule())
                     } else if isSelected {
                         Image(systemName: "checkmark.circle.fill")
-                            .font(.system(size: 18))
+                            .font(.body)
                             .foregroundColor(WWFDesign.Colors.forestMid)
                     }
                 }
@@ -244,6 +283,9 @@ struct TierSelectionRow: View {
             )
             .shadow(color: Color.black.opacity(isSelected ? 0.04 : 0.01), radius: 4, x: 0, y: 2)
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(localizer.localizedString(for: "tier_" + tier.rawValue)). \(localizer.localizedString(for: "tier_" + tier.rawValue + "_desc")). \(tier.sizeLabel). \(isDownloaded ? "Già scaricato" : "")")
+        .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
     }
     
     var tierIcon: String {

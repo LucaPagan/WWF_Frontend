@@ -38,14 +38,14 @@ enum WWFDesign {
     }
 
     enum Typography {
-        static let heroTitle      = Font.custom("Georgia", size: 28).weight(.semibold)
-        static let heroSubtitle   = Font.system(size: 13, weight: .light)
-        static let sectionTitle   = Font.custom("Georgia", size: 19).weight(.semibold)
-        static let trailName      = Font.system(size: 15, weight: .medium)
-        static let trailDesc      = Font.system(size: 12, weight: .light)
-        static let chipLabel      = Font.system(size: 12, weight: .medium)
-        static let metaLabel      = Font.system(size: 11, weight: .regular)
-        static let badge          = Font.system(size: 10, weight: .medium)
+        static let heroTitle      = Font.custom("Georgia", size: 28, relativeTo: .title)
+        static let heroSubtitle   = Font.system(.footnote).weight(.light)
+        static let sectionTitle   = Font.custom("Georgia", size: 19, relativeTo: .headline)
+        static let trailName      = Font.system(.subheadline).weight(.medium)
+        static let trailDesc      = Font.system(.caption).weight(.light)
+        static let chipLabel      = Font.system(.caption).weight(.medium)
+        static let metaLabel      = Font.system(.caption2)
+        static let badge          = Font.system(.caption2).weight(.medium)
     }
 
     enum Radius {
@@ -64,301 +64,172 @@ struct DashboardView: View {
     private var trails: [Trail]
 
     @State private var selectedTrail: Trail? = nil
+    @State private var trailToStart: Trail? = nil
+    @State private var visibleTrailId: UUID? = nil
+    @State private var is3DMap: Bool = false
+    @State private var showInfoSheet: Bool = false
     @ObservedObject private var localizer = LocalizationManager.shared
+    @EnvironmentObject var accessibilityPreferences: AccessibilityPreferences
 
-    // POI globali di tipo warning/danger (scaricati indipendentemente dal percorso — SRS §9.1)
-    @Query(filter: #Predicate<POI> { $0.typeRawValue == "warning" || $0.typeRawValue == "danger" })
-    private var activeWarnings: [POI]
+    private var currentTrail: Trail {
+        if let id = visibleTrailId, let trail = trails.first(where: { $0.id == id }) {
+            return trail
+        }
+        return trails.first ?? Trail(name: "", description: "")
+    }
 
     var body: some View {
         NavigationStack {
-            ScrollView(showsIndicators: false) {
-                VStack(alignment: .leading, spacing: 20) {
+            ZStack(alignment: .bottom) {
+                // Background Map
+                Group {
+                    if is3DMap {
+                        Visitor3DMapView(
+                            trail: currentTrail,
+                            completedPOIIds: [],
+                            currentStepPOIId: nil,
+                            currentNormalizedPosition: .zero,
+                            navigationState: .atStart,
+                            mapType: .realistic
+                        )
+                        .accessibilityLabel("Mappa 3D dell'Oasi degli Astroni")
+                    } else {
+                        VisitorMapView(
+                            trail: currentTrail,
+                            completedPOIIds: [],
+                            currentStepPOIId: nil,
+                            currentNormalizedPosition: .zero,
+                            navigationState: .atStart,
+                            isDashboard: true
+                        )
+                        .accessibilityLabel("Mappa 2D dell'Oasi degli Astroni")
+                    }
+                }
+                .ignoresSafeArea()
+                .animation(.easeInOut, value: is3DMap)
+                .animation(.easeInOut, value: currentTrail.id)
+                
+                // Top Overlay — Organic blob fully containing the title
+                GeometryReader { geo in
+                    ZStack(alignment: .topLeading) {
+                        // Organic blob — wider profile to match redesign
+                        HStack(alignment: .top) {
+                            TopWavyShape()
+                                .fill(WWFDesign.Colors.forestLight)
+                                // CHANGED: wider (full width) to properly cover text
+                                .frame(width: geo.size.width, height: 165)
+                                .shadow(color: .black.opacity(0.30), radius: 6, x: 0, y: 3)
 
-                    // Hero
-                    AstroniBannerView()
-                        .padding(.horizontal, 16)
-                        .padding(.top, 10)
+                            Spacer()
+                        }
+                        .ignoresSafeArea(edges: .top)
 
-                    // Chip info rapide
-                    QuickInfoStripView()
+                        // Title text
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Oasi degli Astroni")
+                                // CHANGED: .bold instead of .heavy — matches image 2 weight
+                                .font(.system(size: 28, weight: .bold, design: .rounded))
+                                .foregroundColor(.white)
 
-                    // Warning attivi (SRS §4.4 — sempre visibili in evidenza)
-                    if !activeWarnings.isEmpty {
-                        VStack(spacing: 8) {
-                            ForEach(activeWarnings) { poi in
-                                GlobalWarningBanner(poi: poi)
+                            Text(localizer.localizedString(for: "explore"))
+                                // CHANGED: slightly lighter subtitle
+                                .font(.system(size: 16, weight: .regular, design: .rounded))
+                                .foregroundColor(.white.opacity(0.88))
+                        }
+                        .padding(.top, 58)
+                        .padding(.leading, 22)
+
+                        // 3D toggle button — top right
+                        HStack {
+                            Spacer()
+                            Button(action: {
+                                is3DMap.toggle()
+                            }) {
+                                ZStack {
+                                    Circle()
+                                        .fill(Color.white)
+                                        .frame(width: 48, height: 48)
+                                        .shadow(color: .black.opacity(0.25), radius: 4, x: 0, y: 2)
+
+                                    Text(is3DMap ? "2D" : "3D")
+                                        .font(.system(size: 18, weight: .bold, design: .rounded))
+                                        .foregroundColor(.black)
+                                }
+                            }
+                            .padding(.top, 58)
+                            .padding(.trailing, 20)
+                        }
+                    }
+                }
+                .ignoresSafeArea(edges: .top)
+                
+                // Floating Info Button — right side, above the trail card
+                VStack {
+                    Spacer()
+                    HStack {
+                        Spacer()
+                        Button(action: {
+                            showInfoSheet = true
+                        }) {
+                            ZStack {
+                                Circle()
+                                    .fill(WWFDesign.Colors.forestLight)
+                                    .frame(width: 44, height: 44)
+                                    .shadow(color: .black.opacity(0.3), radius: 4, x: 0, y: 2)
+                                
+                                Image(systemName: "info")
+                                    .font(.system(size: 20, weight: .bold))
+                                    .foregroundColor(.white)
                             }
                         }
-                        .padding(.horizontal, 16)
+                        .padding(.trailing, 20)
+                        .accessibilityLabel("Informazioni sull'Oasi")
+                        .accessibilityHint("Mostra dettagli sull'Oasi degli Astroni")
                     }
-
-                    // Percorsi attivi
-                    TrailListSection(
-                        trails: trails,
-                        localizer: localizer,
-                        onSelect: { selectedTrail = $0 }
-                    )
-                    .padding(.horizontal, 16)
-
-                    Spacer(minLength: 40)
+                    .padding(.bottom, 200) // Position above the trail card
                 }
-                .padding(.vertical, 8)
-            }
-            .background(Color(.systemGroupedBackground).ignoresSafeArea())
-            .fullScreenCover(item: $selectedTrail) { trail in
-                TrailDetailView(trail: trail)
-            }
-        }
-    }
-}
-
-// MARK: - Hero Banner
-
-struct AstroniBannerView: View {
-    @ObservedObject private var localizer = LocalizationManager.shared
-
-    var body: some View {
-        ZStack(alignment: .bottomLeading) {
-            // Sfondo scuro bosco
-            RoundedRectangle(cornerRadius: WWFDesign.Radius.hero)
-                .fill(WWFDesign.Colors.forestDark)
-                .frame(height: 190)
-
-            // Pattern organico — cerchi sfumati che evocano vegetazione
-            GeometryReader { geo in
-                ZStack {
-                    Circle()
-                        .fill(WWFDesign.Colors.forestMid)
-                        .frame(width: 200, height: 200)
-                        .blur(radius: 50)
-                        .offset(x: geo.size.width * 0.6, y: -30)
-                        .opacity(0.6)
-
-                    Circle()
-                        .fill(WWFDesign.Colors.forestLight)
-                        .frame(width: 100, height: 100)
-                        .blur(radius: 40)
-                        .offset(x: geo.size.width * 0.75, y: 60)
-                        .opacity(0.25)
-                }
-            }
-            .clipShape(RoundedRectangle(cornerRadius: WWFDesign.Radius.hero))
-
-            // Icona bussola esplorazione decorativa in alto a destra
-            Image(systemName: "safari.fill")
-                .font(.system(size: 110))
-                .foregroundColor(WWFDesign.Colors.leafGreen.opacity(0.07))
-                .rotationEffect(.degrees(-15))
-                .offset(x: UIScreen.main.bounds.width - 180, y: -20)
-
-            // Contenuto
-            VStack(alignment: .leading, spacing: 8) {
-                // Badge stato apertura
-                HStack(spacing: 6) {
-                    Circle()
-                        .fill(WWFDesign.Colors.leafGreen)
-                        .frame(width: 6, height: 6)
-                    Text(localizer.localizedString(for: "oasi_hours"))
-                        .font(WWFDesign.Typography.chipLabel)
-                        .foregroundColor(WWFDesign.Colors.leafLight)
-                }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 5)
-                .background(WWFDesign.Colors.leafGreen.opacity(0.18))
-                .overlay(
-                    Capsule().stroke(WWFDesign.Colors.leafGreen.opacity(0.35), lineWidth: 0.5)
-                )
-                .clipShape(Capsule())
-
-                Spacer()
-
-                // Titolo
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("Oasi degli Astroni")
-                        .font(WWFDesign.Typography.heroTitle)
-                        .foregroundColor(Color(red: 0.941, green: 0.929, blue: 0.902)) // #f0ede6
-
-                    Text(localizer.localizedString(for: "oasi_subtitle"))
-                        .font(WWFDesign.Typography.heroSubtitle)
-                        .foregroundColor(Color(red: 0.941, green: 0.929, blue: 0.902).opacity(0.55))
-                }
-            }
-            .padding(20)
-            .frame(height: 190, alignment: .leading)
-        }
-        .clipShape(RoundedRectangle(cornerRadius: WWFDesign.Radius.hero))
-    }
-}
-
-// MARK: - Quick Info Strip
-
-struct QuickInfoStripView: View {
-    @ObservedObject private var localizer = LocalizationManager.shared
-
-    private let chips: [(icon: String, keyOrText: String, style: WWFChipStyle)] = [
-        ("leaf.fill",          "free_entrance",  .green),
-        ("wifi.slash",         "offline_ready",  .blue),
-        ("qrcode.viewfinder",  "qr_required",    .purple),
-        ("map.fill",           "local_map",      .amber),
-    ]
-
-    var body: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                ForEach(chips, id: \.icon) { chip in
-                    WWFChipView(
-                        icon: chip.icon,
-                        label: localizer.localizedString(for: chip.keyOrText),
-                        style: chip.style
-                    )
-                }
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 4)
-        }
-    }
-}
-
-// MARK: - Chip Component
-
-enum WWFChipStyle {
-    case green, blue, purple, amber
-
-    var fillColor: Color {
-        switch self {
-        case .green:  return Color(red: 0.918, green: 0.953, blue: 0.871)
-        case .blue:   return Color(red: 0.902, green: 0.945, blue: 0.984)
-        case .purple: return Color(red: 0.933, green: 0.929, blue: 0.996)
-        case .amber:  return Color(red: 0.980, green: 0.933, blue: 0.851)
-        }
-    }
-
-    var borderColor: Color {
-        switch self {
-        case .green:  return Color(red: 0.753, green: 0.867, blue: 0.592)
-        case .blue:   return Color(red: 0.710, green: 0.831, blue: 0.957)
-        case .purple: return Color(red: 0.808, green: 0.796, blue: 0.965)
-        case .amber:  return Color(red: 0.980, green: 0.780, blue: 0.459)
-        }
-    }
-
-    var textColor: Color {
-        switch self {
-        case .green:  return Color(red: 0.231, green: 0.427, blue: 0.067)
-        case .blue:   return Color(red: 0.094, green: 0.373, blue: 0.647)
-        case .purple: return Color(red: 0.235, green: 0.204, blue: 0.537)
-        case .amber:  return Color(red: 0.522, green: 0.310, blue: 0.043)
-        }
-    }
-}
-
-struct WWFChipView: View {
-    let icon: String
-    let label: String
-    let style: WWFChipStyle
-
-    var body: some View {
-        HStack(spacing: 5) {
-            Image(systemName: icon)
-                .font(.system(size: 11, weight: .medium))
-                .foregroundColor(style.textColor)
-            Text(label)
-                .font(WWFDesign.Typography.chipLabel)
-                .foregroundColor(style.textColor)
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 7)
-        .background(style.fillColor)
-        .overlay(
-            Capsule().stroke(style.borderColor, lineWidth: 0.5)
-        )
-        .clipShape(Capsule())
-    }
-}
-
-// MARK: - Global Warning Banner (SRS §4.4 & §9.1)
-
-struct GlobalWarningBanner: View {
-    let poi: POI
-    @ObservedObject private var localizer = LocalizationManager.shared
-
-    private var isDanger: Bool { poi.type == .danger }
-
-    var body: some View {
-        HStack(alignment: .top, spacing: 10) {
-            Image(systemName: isDanger ? "exclamationmark.triangle.fill" : "info.circle.fill")
-                .font(.system(size: 15, weight: .medium))
-                .foregroundColor(isDanger ? WWFDesign.Colors.hardText : WWFDesign.Colors.warningText)
-                .padding(.top, 1)
-
-            VStack(alignment: .leading, spacing: 3) {
-                Text(localizer.localizedString(for: isDanger ? "danger_label" : "warning_label"))
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(isDanger ? WWFDesign.Colors.hardText : WWFDesign.Colors.warningText)
-
-                Text(poi.localizedDescription)
-                    .font(.system(size: 11, weight: .light))
-                    .foregroundColor(isDanger ? WWFDesign.Colors.hardText.opacity(0.8) : WWFDesign.Colors.warningBody)
-                    .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-
-            Spacer()
-        }
-        .padding(12)
-        .background(
-            isDanger
-                ? WWFDesign.Colors.hardFill
-                : WWFDesign.Colors.warningFill
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: WWFDesign.Radius.warning)
-                .stroke(
-                    isDanger ? WWFDesign.Colors.hardText.opacity(0.25) : WWFDesign.Colors.warningBorder,
-                    lineWidth: 0.5
-                )
-        )
-        .clipShape(RoundedRectangle(cornerRadius: WWFDesign.Radius.warning))
-    }
-}
-
-// MARK: - Trail List Section
-
-struct TrailListSection: View {
-    let trails: [Trail]
-    let localizer: LocalizationManager
-    let onSelect: (Trail) -> Void
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            // Header sezione
-            HStack(alignment: .firstTextBaseline) {
-                Text(localizer.localizedString(for: "active_trails"))
-                    .font(WWFDesign.Typography.sectionTitle)
-                    .foregroundColor(.primary)
-
-                Spacer()
-
+                
+                // Bottom Overlay: Trail Cards
                 if !trails.isEmpty {
-                    Text("\(trails.count) \(localizer.localizedString(for: "available"))")
-                        .font(WWFDesign.Typography.metaLabel)
-                        .foregroundColor(.secondary)
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 16) {
+                            ForEach(trails) { trail in
+                                AstroniTrailCard(trail: trail)
+                                    .containerRelativeFrame(.horizontal, count: 1, spacing: 16)
+                                    .onTapGesture {
+                                        selectedTrail = trail
+                                    }
+                            }
+                        }
+                        .scrollTargetLayout()
+                    }
+                    .fixedSize(horizontal: false, vertical: true)
+                    .scrollTargetBehavior(.viewAligned)
+                    .scrollPosition(id: $visibleTrailId)
+                    .safeAreaPadding(.horizontal, 24)
+                    .padding(.bottom, 120)
+                    .onAppear {
+                        if visibleTrailId == nil {
+                            visibleTrailId = trails.first?.id
+                        }
+                    }
                 }
             }
-
-            if trails.isEmpty {
-                ContentUnavailableView(
-                    localizer.localizedString(for: "no_active_trails"),
-                    systemImage: "map",
-                    description: Text(localizer.localizedString(for: "no_active_trails_desc"))
-                )
-                .padding(.top, 40)
-            } else {
-                ForEach(trails) { trail in
-                    AstroniTrailCard(trail: trail)
-                        .onTapGesture { onSelect(trail) }
+            .sheet(isPresented: $showInfoSheet) {
+                OasiInfoSheetView()
+                    .presentationDetents([.medium])
+            }
+            .sheet(item: $selectedTrail) { trail in
+                DownloadSelectionView(trail: trail) {
+                    selectedTrail = nil
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        trailToStart = trail
+                    }
                 }
+                .presentationDetents([.medium, .large])
+            }
+            .fullScreenCover(item: $trailToStart) { trail in
+                ActiveTrailView(trail: trail)
             }
         }
     }
@@ -401,81 +272,160 @@ struct AstroniTrailCard: View {
     }
 
     var body: some View {
+        // Main Card
         HStack(spacing: 0) {
-            // Accento laterale colorato per difficoltà — scansione visiva immediata
-            RoundedRectangle(cornerRadius: 2)
-                .fill(accentColor)
-                .frame(width: 3)
-                .padding(.vertical, 14)
-
-            VStack(alignment: .leading, spacing: 10) {
+            // Left Green Bar (Inside the card)
+            ZStack {
+                CardBlobShape()
+                    .fill(WWFDesign.Colors.forestLight)
+                CardBlobShape()
+                    .stroke(Color.black, lineWidth: 2.5)
+            }
+            .frame(width: 32)
+            
+            VStack(alignment: .leading, spacing: 12) {
                 // Top row
-                HStack(alignment: .top) {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(trail.localizedName)
-                            .font(WWFDesign.Typography.trailName)
-                            .foregroundColor(.primary)
-
-                        Text(trail.localizedDescription)
-                            .font(WWFDesign.Typography.trailDesc)
-                            .foregroundColor(.secondary)
-                            .lineLimit(2)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-
-                    Spacer()
-
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundColor(Color(.tertiaryLabel))
-                        .padding(.top, 2)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(trail.localizedName)
+                        .font(.system(size: 22, weight: .bold, design: .rounded))
+                        .foregroundColor(.black)
+                    
+                    Text(trail.localizedDescription)
+                        .font(.system(size: 15, weight: .regular))
+                        .foregroundColor(.black.opacity(0.8))
+                        // CHANGED: lineLimit increased to 3 — prevents mid-word truncation ("ci...")
+                        // matching the full description visible in image 2
+                        .lineLimit(3)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-
+                
                 // Meta row
-                HStack(spacing: 12) {
+                HStack(spacing: 16) {
                     // Badge difficoltà
-                    Text(difficultyLabel)
-                        .font(WWFDesign.Typography.badge)
-                        .fontWeight(.semibold)
-                        .tracking(0.3)
-                        .foregroundColor(badgeText)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .background(badgeFill)
-                        .clipShape(Capsule())
-
-                    // Durata
-                    Label {
-                        Text("\(trail.estimatedMinutes ?? 60) min")
-                            .font(WWFDesign.Typography.metaLabel)
-                            .foregroundColor(.secondary)
-                    } icon: {
-                        Image(systemName: "clock")
-                            .font(.system(size: 11))
-                            .foregroundColor(Color(.tertiaryLabel))
+                    HStack(spacing: 4) {
+                        Image(systemName: "leaf.fill")
+                            .font(.caption)
+                        Text(difficultyLabel)
+                            .font(.system(size: 14, weight: .semibold))
                     }
-
+                    .foregroundColor(badgeText)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(badgeFill)
+                    .clipShape(Capsule())
+                    
+                    // Durata
+                    HStack(spacing: 4) {
+                        Image(systemName: "clock")
+                            .font(.caption)
+                            .foregroundColor(Color(red: 0.522, green: 0.310, blue: 0.043))
+                        Text("\(trail.estimatedMinutes ?? 60) min")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(.black)
+                    }
+                    
                     // Tappe
-                    Label {
+                    HStack(spacing: 4) {
+                        Image(systemName: "shoe.fill")
+                            .font(.caption)
+                            .foregroundColor(Color(red: 0.522, green: 0.310, blue: 0.043))
                         Text("\(trail.steps.count) \(localizer.localizedString(for: "steps_label"))")
-                            .font(WWFDesign.Typography.metaLabel)
-                            .foregroundColor(.secondary)
-                    } icon: {
-                        Image(systemName: "mappin.and.ellipse")
-                            .font(.system(size: 11))
-                            .foregroundColor(Color(.tertiaryLabel))
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(.black)
                     }
                 }
             }
-            .padding(14)
+            .padding(.vertical, 20)
+            .padding(.trailing, 20)
+            .padding(.leading, 12)
         }
-        .background(Color(.systemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: WWFDesign.Radius.card))
-        .overlay(
-            RoundedRectangle(cornerRadius: WWFDesign.Radius.card)
-                .stroke(Color(.separator).opacity(0.4), lineWidth: 0.5)
-        )
-        .shadow(color: .black.opacity(0.04), radius: 8, x: 0, y: 2)
+        .background(Color.white)
+        .clipShape(RoundedRectangle(cornerRadius: 24))
+        .overlay(RoundedRectangle(cornerRadius: 24).stroke(Color.black, lineWidth: 2.5))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(trail.localizedName). \(trail.localizedDescription). \(difficultyLabel). \(trail.estimatedMinutes ?? 60) minuti. \(trail.steps.count) tappe.")
+        .accessibilityHint("Tocca due volte per aprire i dettagli del percorso")
+        .accessibilityAddTraits(.isButton)
+    }
+}
+
+// MARK: - Oasi Info Sheet
+
+struct OasiInfoSheetView: View {
+    @ObservedObject private var localizer = LocalizationManager.shared
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    // Hero icon
+                    HStack {
+                        Spacer()
+                        ZStack {
+                            Circle()
+                                .fill(WWFDesign.Colors.forestLight.opacity(0.15))
+                                .frame(width: 80, height: 80)
+                            Image(systemName: "leaf.fill")
+                                .font(.system(size: 36))
+                                .foregroundColor(WWFDesign.Colors.forestLight)
+                        }
+                        Spacer()
+                    }
+                    .padding(.top, 8)
+
+                    Text("L'Oasi degli Astroni è una riserva naturale situata all'interno di un antico cratere vulcanico nei Campi Flegrei, a Napoli. Gestita dal WWF Italia, ospita una ricca biodiversità con boschi, laghi e fauna selvatica.")
+                        .font(.system(size: 16))
+                        .foregroundColor(.secondary)
+                        .lineSpacing(4)
+
+                    // Info grid
+                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                        InfoTile(icon: "mappin.circle.fill", title: "Posizione", value: "Napoli, Italia")
+                        InfoTile(icon: "tree.fill", title: "Tipo", value: "Riserva WWF")
+                        InfoTile(icon: "ruler", title: "Area", value: "247 ettari")
+                        InfoTile(icon: "calendar", title: "Dal", value: "1991")
+                    }
+                }
+                .padding(24)
+            }
+            .navigationTitle("Oasi degli Astroni")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(action: { dismiss() }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Info Tile
+
+private struct InfoTile: View {
+    let icon: String
+    let title: String
+    let value: String
+
+    var body: some View {
+        VStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.title2)
+                .foregroundColor(WWFDesign.Colors.forestLight)
+            Text(title)
+                .font(.caption)
+                .foregroundColor(.secondary)
+            Text(value)
+                .font(.subheadline)
+                .fontWeight(.semibold)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 16)
+        .background(Color(.systemGray6))
+        .clipShape(RoundedRectangle(cornerRadius: 14))
     }
 }
 
@@ -484,36 +434,4 @@ struct AstroniTrailCard: View {
 #Preview("Dashboard — con percorsi") {
     DashboardView()
         .modelContainer(for: [Trail.self, POI.self], inMemory: true)
-}
-
-#Preview("Trail Card — Facile") {
-    let trail = Trail(name: "Sentiero del Lago Grande", description: "Passeggiata panoramica attorno al lago vulcanico principale")
-    trail.difficulty = .easy
-    trail.estimatedMinutes = 60
-    trail.isActive = true
-    return AstroniTrailCard(trail: trail)
-        .padding()
-        .background(Color(.systemGroupedBackground))
-}
-
-#Preview("Trail Card — Impegnativo") {
-    let trail = Trail(name: "Anello del Cratere", description: "Percorso completo del perimetro vulcanico con dislivello significativo")
-    trail.difficulty = .hard
-    trail.estimatedMinutes = 150
-    trail.isActive = true
-    return AstroniTrailCard(trail: trail)
-        .padding()
-        .background(Color(.systemGroupedBackground))
-}
-
-#Preview("Hero Banner") {
-    AstroniBannerView()
-        .padding()
-}
-
-#Preview("Warning Banner — Danger") {
-    let poi = POI(name: "Zona Nord", description: "Sentiero temporaneamente chiuso per manutenzione. Non accedere.", x: 0.0, y: 0.0)
-    poi.type = .danger
-    return GlobalWarningBanner(poi: poi)
-        .padding()
 }

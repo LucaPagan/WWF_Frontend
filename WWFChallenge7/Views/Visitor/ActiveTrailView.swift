@@ -30,6 +30,7 @@ struct ActiveTrailView: View {
     let trail: Trail
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var localizer = LocalizationManager.shared
+    @EnvironmentObject var accessibilityPreferences: AccessibilityPreferences
 
     // Navigation state
     @State private var completedPOIIds: Set<UUID> = []
@@ -42,6 +43,7 @@ struct ActiveTrailView: View {
     @State private var scannedPOI: POI? = nil
     @State private var showQRErrorAlert = false
     @State private var qrErrorMessage  = ""
+    @State private var showManualCode  = false
 
     // MARK: Computed helpers
 
@@ -111,6 +113,9 @@ struct ActiveTrailView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 24))
                         .shadow(color: .black.opacity(0.12), radius: 12, x: 0, y: -4)
                 )
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.horizontal)
+                .padding(.bottom, 20)
             }
         }
         // ── Top-leading controls ──────────────────────────────────────────────
@@ -128,12 +133,14 @@ struct ActiveTrailView: View {
                             .clipShape(Circle())
                         
                         Image(systemName: "xmark")
-                            .font(.system(size: 16, weight: .semibold))
+                            .font(.headline)
                             .foregroundColor(WWFDesign.Colors.leafLight)
                     }
-                    .frame(width: 40, height: 40)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Circle())
                 }
-                .padding(.top, 44) // Posizionamento sotto notch
+                .accessibilityLabel("Chiudi percorso")
+                .padding(.top, 8)
 
                 mapSwitcherMenu
             }
@@ -149,12 +156,51 @@ struct ActiveTrailView: View {
                 .padding(.vertical, 5)
                 .background(Color.black.opacity(0.4))
                 .clipShape(Capsule())
-                .padding(.top, 60) // Allineato al pulsante a sinistra
+                .padding(.top, 8)
                 .padding(.trailing, 16)
+                .accessibilityLabel("Progresso: \(completedPOIIds.count) su \(trail.steps.count) tappe completate")
         }
         // ── Sheets / Alerts ───────────────────────────────────────────────────
         .sheet(isPresented: $showScanner) {
-            QRScannerView { payload in handleQRScan(payload: payload) }
+            ZStack(alignment: .bottom) {
+                QRScannerView { payload in handleQRScan(payload: payload) }
+                    .ignoresSafeArea()
+                
+                Button {
+                    showManualCode = true
+                } label: {
+                    Text(localizer.localizedString(for: "manual_code_entry"))
+                        .font(.headline)
+                        .padding()
+                        .frame(maxWidth: .infinity)
+                        .background(Color.black.opacity(0.7))
+                        .foregroundColor(.white)
+                        .cornerRadius(12)
+                        .padding()
+                        .padding(.bottom, 20)
+                }
+            }
+            .sheet(isPresented: $showManualCode) {
+                NumericCodeEntryView { poi in
+                    showManualCode = false
+                    showScanner = false
+                    if !completedPOIIds.contains(poi.id) {
+                        completedPOIIds.insert(poi.id)
+                        scannedPOI = poi
+                        navigationState = .poiReached(poi)
+                    } else {
+                        qrErrorMessage = localizer.localizedString(for: "poi_already_visited")
+                        showQRErrorAlert = true
+                    }
+                }
+            }
+            .onDisappear {
+                if scannedPOI != nil {
+                    showPOIModal = true
+                } else if !qrErrorMessage.isEmpty {
+                    showQRErrorAlert = true
+                }
+            }
         }
         .sheet(isPresented: $showPOIModal, onDismiss: handleModalDismiss) {
             if let poi = scannedPOI {
@@ -175,24 +221,28 @@ struct ActiveTrailView: View {
 
     @ViewBuilder
     private var mapLayer: some View {
-        switch mapDisplayMode {
-        case .flat2D:
-            VisitorMapView(
-                trail: trail,
-                completedPOIIds: completedPOIIds,
-                currentStepPOIId: currentStep?.poi?.id,
-                currentNormalizedPosition: currentNormalizedPosition,
-                navigationState: navigationState
-            )
-        case .model3D(let mapType):
-            Visitor3DMapView(
-                trail: trail,
-                completedPOIIds: completedPOIIds,
-                currentStepPOIId: currentStep?.poi?.id,
-                currentNormalizedPosition: currentNormalizedPosition,
-                navigationState: navigationState,
-                mapType: mapType
-            )
+        if accessibilityPreferences.shouldDefaultToListView {
+            PathListView(trail: trail)
+        } else {
+            switch mapDisplayMode {
+            case .flat2D:
+                VisitorMapView(
+                    trail: trail,
+                    completedPOIIds: completedPOIIds,
+                    currentStepPOIId: currentStep?.poi?.id,
+                    currentNormalizedPosition: currentNormalizedPosition,
+                    navigationState: navigationState
+                )
+            case .model3D(let mapType):
+                Visitor3DMapView(
+                    trail: trail,
+                    completedPOIIds: completedPOIIds,
+                    currentStepPOIId: currentStep?.poi?.id,
+                    currentNormalizedPosition: currentNormalizedPosition,
+                    navigationState: navigationState,
+                    mapType: mapType
+                )
+            }
         }
     }
 
@@ -227,11 +277,14 @@ struct ActiveTrailView: View {
                     .clipShape(Circle())
                 
                 Image(systemName: mapIconName)
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(.headline)
                     .foregroundColor(WWFDesign.Colors.leafLight)
             }
-            .frame(width: 40, height: 40)
+            .frame(width: 44, height: 44)
+            .contentShape(Circle())
         }
+        .accessibilityLabel("Cambia tipo mappa")
+        .accessibilityHint("Seleziona mappa 2D o 3D")
     }
 
     private var mapIconName: String {
@@ -281,6 +334,8 @@ struct ActiveTrailView: View {
                     .clipShape(RoundedRectangle(cornerRadius: WWFDesign.Radius.card))
                     .shadow(color: WWFDesign.Colors.forestMid.opacity(0.2), radius: 6, x: 0, y: 3)
             }
+            .accessibilityLabel("Inizia percorso")
+            .accessibilityHint("Avvia la navigazione del sentiero")
 
         case .navigatingTo:
             Button { showScanner = true } label: {
@@ -293,6 +348,8 @@ struct ActiveTrailView: View {
                     .clipShape(RoundedRectangle(cornerRadius: WWFDesign.Radius.card))
                     .shadow(color: WWFDesign.Colors.forestMid.opacity(0.2), radius: 6, x: 0, y: 3)
             }
+            .accessibilityLabel("Scansiona QR code")
+            .accessibilityHint("Apri la fotocamera per scansionare il QR code del punto di interesse")
 
         case .poiReached:
             EmptyView()
@@ -316,10 +373,12 @@ struct ActiveTrailView: View {
     private func handleQRScan(payload: String) {
         showScanner = false
         let clean = payload.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        scannedPOI = nil
+        qrErrorMessage = ""
 
         guard trail.isActive else {
             qrErrorMessage = localizer.localizedString(for: "trail_not_active")
-            showQRErrorAlert = true
             return
         }
 
@@ -341,20 +400,17 @@ struct ActiveTrailView: View {
             ✅ \(expectedOneOf):
             • \(expected.isEmpty ? fallbackEmpty : expected)
             """
-            showQRErrorAlert = true
             return
         }
 
         if completedPOIIds.contains(matched.id) {
             qrErrorMessage = localizer.localizedString(for: "poi_already_visited")
-            showQRErrorAlert = true
             return
         }
 
         completedPOIIds.insert(matched.id)
         scannedPOI = matched
         navigationState = .poiReached(matched)
-        showPOIModal = true
     }
 
     // MARK: Modal dismiss
@@ -402,44 +458,48 @@ struct StartPointCard: View {
         .padding()
         .background(WWFDesign.Colors.forestLight.opacity(0.08))
         .clipShape(RoundedRectangle(cornerRadius: WWFDesign.Radius.card))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Punto di partenza: \(name). \(description). \(nextStepInstructions ?? "")")
     }
 }
 
 // MARK: - NavigatingCard
 
-struct NavigatingCard: View {
-    let step: TrailStep
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 10) {
-                ZStack {
-                    Circle().fill(Color.orange).frame(width: 36, height: 36)
-                    Image(systemName: "arrow.triangle.turn.up.right.circle.fill")
-                        .font(.caption).foregroundColor(.white)
-                }
-                VStack(alignment: .leading, spacing: 2) {
-                    if let poi = step.poi {
-                        Text("\(LocalizationManager.shared.localizedString(for: "go_to")): \(poi.localizedName)")
-                            .font(.subheadline)
-                            .fontWeight(.bold)
-                            .foregroundColor(WWFDesign.Colors.forestDark)
+    struct NavigatingCard: View {
+        let step: TrailStep
+        
+        var body: some View {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 10) {
+                    ZStack {
+                        Circle().fill(Color.orange).frame(width: 36, height: 36)
+                        Image(systemName: "arrow.triangle.turn.up.right.circle.fill")
+                            .font(.caption).foregroundColor(.white)
                     }
-                    Text(LocalizationManager.shared.localizedString(for: "scan_qr_desc")).font(.caption).foregroundColor(.secondary)
+                    VStack(alignment: .leading, spacing: 2) {
+                        if let poi = step.poi {
+                            Text("\(LocalizationManager.shared.localizedString(for: "go_to")): \(poi.localizedName)")
+                                .font(.subheadline)
+                                .fontWeight(.bold)
+                                .foregroundColor(WWFDesign.Colors.forestDark)
+                        }
+                        Text(LocalizationManager.shared.localizedString(for: "scan_qr_desc")).font(.caption).foregroundColor(.secondary)
+                    }
+                }
+                Divider()
+                HStack(alignment: .top, spacing: 8) {
+                    Image(systemName: "arrow.turn.up.right")
+                        .foregroundColor(.orange).font(.caption).padding(.top, 2)
+                    Text(step.instructions).font(.caption).foregroundColor(.secondary).lineLimit(4)
                 }
             }
-            Divider()
-            HStack(alignment: .top, spacing: 8) {
-                Image(systemName: "arrow.turn.up.right")
-                    .foregroundColor(.orange).font(.caption).padding(.top, 2)
-                Text(step.instructions).font(.caption).foregroundColor(.secondary).lineLimit(4)
-            }
+            .padding()
+            .background(Color.orange.opacity(0.08))
+            .clipShape(RoundedRectangle(cornerRadius: WWFDesign.Radius.card))
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("Prossima tappa: \(step.poi?.localizedName ?? ""). \(step.instructions). Distanza: \(step.distanceMeters) metri, circa \(step.estimatedMinutes) minuti.")
         }
-        .padding()
-        .background(Color.orange.opacity(0.08))
-        .clipShape(RoundedRectangle(cornerRadius: WWFDesign.Radius.card))
     }
-}
 
 // MARK: - POIReachedCard
 
@@ -464,5 +524,7 @@ struct POIReachedCard: View {
         .padding()
         .background(WWFDesign.Colors.leafGreen.opacity(0.08))
         .clipShape(RoundedRectangle(cornerRadius: WWFDesign.Radius.card))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Raggiunto: \(poi.localizedName). Tocca per visualizzare le informazioni.")
     }
 }

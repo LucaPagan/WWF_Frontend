@@ -18,6 +18,7 @@ struct MapPlaceholderView: View {
             .resizable()
             .scaledToFill()
             .clipped()
+            .accessibilityLabel("Mappa dell'oasi degli Astroni")
     }
 }
 
@@ -79,28 +80,36 @@ struct POIMarkerView: View {
     let isCompleted: Bool
     let isCurrent: Bool
 
+    private var fillColor: Color {
+        if isCompleted { return .gray }
+        if isCurrent { return .yellow }
+        return WWFDesign.Colors.forestLight
+    }
+
     var body: some View {
         ZStack {
             if isCurrent {
                 Circle()
                     .fill(Color.yellow.opacity(0.3))
-                    .frame(width: 44, height: 44)
+                    .frame(width: 48, height: 48)
+                    .offset(y: -6) // Offset up to center on pin head
             }
-            Circle()
-                .fill(
-                    isCompleted ? Color.gray
-                    : isCurrent ? Color.yellow
-                    : WWFDesign.Colors.forestLight
-                )
-                .frame(width: 28, height: 28)
+
+            // Teardrop pin shape
+            TeardropPinShape()
+                .fill(fillColor)
+                .frame(width: 28, height: 40)
                 .overlay(
                     Image(systemName: isCompleted ? "checkmark" : poi.type.icon)
                         .font(.caption2)
                         .fontWeight(.bold)
                         .foregroundColor(.white)
+                        .offset(y: -6) // Center icon in the circular head, not the tail
                 )
-                .shadow(radius: 3)
+                .shadow(color: .black.opacity(0.3), radius: 3, x: 0, y: 2)
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(poi.localizedName), \(isCompleted ? "completato" : isCurrent ? "tappa corrente" : "da visitare")")
     }
 }
 
@@ -143,5 +152,7 @@ struct CompletedBanner: View {
         .padding()
         .background(WWFDesign.Colors.forestLight.opacity(0.1))
         .clipShape(RoundedRectangle(cornerRadius: WWFDesign.Radius.card))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Percorso completato. Ottimo lavoro!")
     }
 }

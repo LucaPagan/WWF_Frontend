@@ -12,8 +12,7 @@ import Combine
 struct ProfileView: View {
     @ObservedObject private var localizer = LocalizationManager.shared
     @AppStorage("preferredLanguage") private var language = "it"
-    @AppStorage("largeText") private var largeText = false
-    @AppStorage("simplifiedMode") private var simplifiedMode = false
+    @EnvironmentObject var accessibilityPreferences: AccessibilityPreferences
     @AppStorage("notificationsEnabled") private var notifications = true
 
     var body: some View {
@@ -53,6 +52,7 @@ struct ProfileView: View {
                             .foregroundColor(Color(red: 0.647, green: 0.784, blue: 0.922).opacity(0.06))
                             .rotationEffect(.degrees(15))
                             .offset(x: UIScreen.main.bounds.width - 180, y: -20)
+                            .accessibilityHidden(true)
 
                         // Contenuto
                         VStack(alignment: .leading, spacing: 8) {
@@ -124,15 +124,37 @@ struct ProfileView: View {
                                 .foregroundColor(WWFDesign.Colors.forestDark)
                             
                             VStack(spacing: 12) {
-                                Toggle(localizer.localizedString(for: "large_text"), isOn: $largeText)
+                                Toggle(localizer.localizedString(for: "large_text"), isOn: $accessibilityPreferences.preferListView)
                                     .tint(WWFDesign.Colors.forestMid)
                                     .font(WWFDesign.Typography.trailName)
+                                    .accessibilityLabel(localizer.localizedString(for: "large_text"))
+                                    .accessibilityHint("Aumenta la dimensione del testo nell'app")
                                 
                                 Divider()
                                 
-                                Toggle(localizer.localizedString(for: "simplified_mode"), isOn: $simplifiedMode)
+                                Toggle(localizer.localizedString(for: "simplified_mode"), isOn: $accessibilityPreferences.easyReadMode)
                                     .tint(WWFDesign.Colors.forestMid)
                                     .font(WWFDesign.Typography.trailName)
+                                    .accessibilityLabel(localizer.localizedString(for: "simplified_mode"))
+                                    .accessibilityHint("Mostra una versione semplificata dell'interfaccia")
+                                
+                                Divider()
+                                
+                                NavigationLink {
+                                    AccessibilitySettingsView()
+                                } label: {
+                                    HStack {
+                                        Label("Impostazioni accessibilità avanzate", systemImage: "accessibility")
+                                            .font(WWFDesign.Typography.trailName)
+                                            .foregroundColor(WWFDesign.Colors.forestMid)
+                                        Spacer()
+                                        Image(systemName: "chevron.right")
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                    }
+                                }
+                                .accessibilityLabel("Impostazioni accessibilità avanzate")
+                                .accessibilityHint("Apri le impostazioni per testo semplificato, audio automatico e preferenze di navigazione")
                             }
                             .padding()
                             .background(Color(.systemBackground))
@@ -185,6 +207,8 @@ struct ProfileView: View {
                                             .foregroundColor(WWFDesign.Colors.forestMid)
                                     }
                                 }
+                                .accessibilityLabel("Sito web WWF Italia")
+                                .accessibilityHint("Apre il sito wwf.it nel browser")
                             }
                             .padding()
                             .background(Color(.systemBackground))

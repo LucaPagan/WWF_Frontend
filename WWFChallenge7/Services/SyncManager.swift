@@ -97,7 +97,10 @@ actor UserSyncWorker: ModelActor {
         // 5. DownloadPackages (RLS: is_ready = true)
         count += try await pullDownloadPackages()
 
-        // 6. Translations
+        // 6. Contents
+        count += try await pullContents()
+
+        // 7. Translations
         count += try await pullTranslations()
 
         try modelContext.save()
@@ -117,7 +120,9 @@ actor UserSyncWorker: ModelActor {
                   let recordIdStr = data["record_id"] as? String, let recordId = UUID(uuidString: recordIdStr),
                   let fieldName = data["field_name"] as? String,
                   let langCode = data["language_code"] as? String,
-                  let translatedText = data["translated_text"] as? String else { continue }
+                  let rawTranslatedText = data["translated_text"] as? String else { continue }
+            
+            let translatedText = rawTranslatedText
 
             remoteIds.insert(remoteId)
             let descriptor = FetchDescriptor<LocalTranslation>(predicate: #Predicate { $0.id == remoteId })
@@ -221,9 +226,9 @@ actor UserSyncWorker: ModelActor {
             if let existingStep = try modelContext.fetch(stepDescriptor).first {
                 // Update mutable fields instead of skipping
                 existingStep.stepOrder = data["step_order"] as? Int ?? existingStep.stepOrder
-                existingStep.directionHint = data["direction_hint"] as? String
-                existingStep.distanceMeters = data["distance_meters"] as? Int
-                existingStep.estimatedMinutes = data["estimated_minutes"] as? Int
+                existingStep.directionHint = data["direction_hint"] as? String ?? existingStep.directionHint
+                existingStep.distanceMeters = data["distance_meters"] as? Int ?? existingStep.distanceMeters
+                existingStep.estimatedMinutes = data["estimated_minutes"] as? Int ?? existingStep.estimatedMinutes
                 existingStep.pathGeometry = data["path_geometry"] as? String
                 count += 1
                 continue
@@ -238,9 +243,9 @@ actor UserSyncWorker: ModelActor {
 
             let step = TrailStep(
                 stepOrder: data["step_order"] as? Int ?? 0,
-                directionHint: data["direction_hint"] as? String,
-                distanceMeters: data["distance_meters"] as? Int,
-                estimatedMinutes: data["estimated_minutes"] as? Int,
+                directionHint: data["direction_hint"] as? String ?? "",
+                distanceMeters: data["distance_meters"] as? Int ?? 0,
+                estimatedMinutes: data["estimated_minutes"] as? Int ?? 0,
                 pathGeometry: data["path_geometry"] as? String,
                 poi: poi,
                 fixedID: remoteId
@@ -253,6 +258,57 @@ actor UserSyncWorker: ModelActor {
         // Prune orphaned steps
         try pruneStaleRecords(of: TrailStep.self, remoteIds: remoteIds)
 
+        return count
+    }
+
+    // MARK: - Pull Contents
+
+    private func pullContents() async throws -> Int {
+        let remoteContents = try await networkClient.fetch(
+            from: "contents",
+            query: "select=*&order=sort_order.asc"
+        )
+        var remoteIds = Set<UUID>()
+        var count = 0
+
+        for data in remoteContents {
+            guard let idStr = data["id"] as? String, let remoteId = UUID(uuidString: idStr) else { continue }
+            guard let poiIdStr = data["poi_id"] as? String, let poiId = UUID(uuidString: poiIdStr) else { continue }
+
+            remoteIds.insert(remoteId)
+            let descriptor = FetchDescriptor<Content>(predicate: #Predicate { $0.id == remoteId })
+
+            if let existing = try modelContext.fetch(descriptor).first {
+                existing.updateFromRemote(data)
+            } else {
+                let typeStr = data["type"] as? String ?? "text"
+                let tierStr = data["tier"] as? String ?? "light"
+                let content = Content(
+                    poiId: poiId,
+                    type: ContentType(rawValue: typeStr) ?? .text,
+                    tier: ContentTier(rawValue: tierStr) ?? .light,
+                    fileURL: data["file_url"] as? String,
+                    sortOrder: data["sort_order"] as? Int ?? 0,
+                    altText: data["alt_text"] as? String,
+                    durationSeconds: data["duration_seconds"] as? Int,
+                    languageCode: data["language_code"] as? String ?? "it",
+                    transcriptText: data["transcript_text"] as? String,
+                    hasEasyRead: data["has_easy_read"] as? Bool ?? false,
+                    subtitleURL: data["subtitle_url"] as? String,
+                    fixedID: remoteId
+                )
+                // Handle JSONB data field
+                if let jsonObj = data["data"], !(jsonObj is NSNull) {
+                    if JSONSerialization.isValidJSONObject(jsonObj) {
+                        content.data = try? JSONSerialization.data(withJSONObject: jsonObj)
+                    }
+                }
+                modelContext.insert(content)
+            }
+            count += 1
+        }
+
+        try pruneStaleRecords(of: Content.self, remoteIds: remoteIds)
         return count
     }
 
@@ -358,6 +414,10 @@ actor UserSyncWorker: ModelActor {
             photoURL: data["photo_url"] as? String,
             isStartPoint: data["is_start_point"] as? Bool ?? false,
             isActive: data["is_active"] as? Bool ?? true,
+            iconName: data["icon_name"] as? String,
+            numericCode: data["numeric_code"] as? String,
+            descriptionKids: data["description_kids"] as? String,
+            descriptionEasyRead: data["description_easy_read"] as? String,
             fixedID: id
         )
         poi.qrPayload = data["qr_payload"] as? String ?? "ASTRONI_POI_\(id.uuidString)"
@@ -384,6 +444,9 @@ actor UserSyncWorker: ModelActor {
             estimatedMinutes: data["estimated_minutes"] as? Int,
             coverImageURL: data["cover_image_url"] as? String,
             startPOIId: startPOIId,
+            targetAge: data["target_age"] as? String,
+            descriptionKids: data["description_kids"] as? String,
+            descriptionEasyRead: data["description_easy_read"] as? String,
             fixedID: id
         )
         trail.needsSync = false

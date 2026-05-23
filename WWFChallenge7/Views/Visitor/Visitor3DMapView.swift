@@ -90,7 +90,7 @@ struct Visitor3DMapView: UIViewRepresentable {
         let cfg = mapType.configuration
         let centerX = cfg.xOffset + cfg.xScale * 0.5
         let centerZ = cfg.zOffset + cfg.zScale * 0.5
-        let camDistance = max(cfg.xScale, cfg.zScale) * 0.85
+        let camDistance = max(cfg.xScale, cfg.zScale) * 1.15
 
         let cameraNode = SCNNode()
         cameraNode.camera = SCNCamera()
@@ -106,7 +106,8 @@ struct Visitor3DMapView: UIViewRepresentable {
         
         let lookAtConstraint = SCNLookAtConstraint(target: {
             let t = SCNNode()
-            t.position = SCNVector3(centerX, 0, centerZ)
+            // Shift target slightly along +Z so the map content appears higher
+            t.position = SCNVector3(centerX, 0, centerZ + camDistance * 0.15)
             scene.rootNode.addChildNode(t)
             return t
         }())
@@ -372,7 +373,7 @@ struct Visitor3DMapView: UIViewRepresentable {
                         mat.diffuse.contents = green
                         mat.emission.contents = green.withAlphaComponent(0.3) // Light glow
                     } else {
-                        mat.diffuse.contents = green.withAlphaComponent(0.15)
+                        mat.diffuse.contents = green.withAlphaComponent(0.8)
                     }
                     
                     mat.isDoubleSided = true

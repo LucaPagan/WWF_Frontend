@@ -49,7 +49,9 @@ final class DownloadManager: ObservableObject {
                           let recordIdStr = data["record_id"] as? String, let recordId = UUID(uuidString: recordIdStr),
                           let fieldName = data["field_name"] as? String,
                           let langCode = data["language_code"] as? String,
-                          let translatedText = data["translated_text"] as? String else { continue }
+                          let rawTranslatedText = data["translated_text"] as? String else { continue }
+                    
+                    let translatedText = rawTranslatedText
                     
                     let desc = FetchDescriptor<LocalTranslation>(predicate: #Predicate { $0.id == remoteId })
                     if let existing = try? context.fetch(desc).first {

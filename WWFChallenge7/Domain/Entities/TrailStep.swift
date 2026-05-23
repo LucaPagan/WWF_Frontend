@@ -21,9 +21,9 @@ final class TrailStep: @unchecked Sendable {
 
     // MARK: - Core Fields (mirror Supabase)
     var stepOrder: Int                     // DB: step_order (CHECK >= 0)
-    var directionHint: String?             // DB: direction_hint — navigation instructions
-    var distanceMeters: Int?               // DB: distance_meters (CHECK > 0)
-    var estimatedMinutes: Int?             // DB: estimated_minutes (CHECK > 0)
+    var directionHint: String              // DB: direction_hint — navigation instructions (NOT NULL)
+    var distanceMeters: Int                // DB: distance_meters (NOT NULL, CHECK > 0)
+    var estimatedMinutes: Int              // DB: estimated_minutes (NOT NULL, CHECK > 0)
     var pathGeometry: String?              // DB: path_geometry — encoded polyline for path tracing
 
     // MARK: - Relationships
@@ -36,9 +36,9 @@ final class TrailStep: @unchecked Sendable {
 
     init(
         stepOrder: Int,
-        directionHint: String? = nil,
-        distanceMeters: Int? = nil,
-        estimatedMinutes: Int? = nil,
+        directionHint: String = "",
+        distanceMeters: Int = 0,
+        estimatedMinutes: Int = 0,
         pathGeometry: String? = nil,
         poi: POI? = nil,
         fixedID: UUID? = nil
@@ -66,7 +66,7 @@ final class TrailStep: @unchecked Sendable {
     /// Alias for directionHint — used by existing views that reference `instructions`
     var instructions: String {
         get {
-            LocalizationManager.shared.localizedField(table: "path_steps", recordId: id, fieldName: "direction_hint", fallback: directionHint ?? "")
+            LocalizationManager.shared.localizedField(table: "path_steps", recordId: id, fieldName: "direction_hint", fallback: directionHint)
         }
         set { directionHint = newValue }
     }

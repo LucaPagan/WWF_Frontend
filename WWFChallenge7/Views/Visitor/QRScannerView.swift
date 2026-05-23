@@ -3,11 +3,12 @@
 //  WWFChallenge7
 //
 //  Created by Luca Pagano on 06/05/26.
+//  Accessibility: haptic feedback, VoiceOver announcement, numeric code fallback button
 //
-
 
 import SwiftUI
 import AVFoundation
+import AudioToolbox
 
 struct QRScannerView: UIViewControllerRepresentable {
     let onScan: (String) -> Void
@@ -27,6 +28,7 @@ final class QRScannerViewController: UIViewController, AVCaptureMetadataOutputOb
     private var captureSession: AVCaptureSession?
     private var previewLayer: AVCaptureVideoPreviewLayer?
     private var hasScanned = false
+    private var successOverlay: UIView?
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -95,7 +97,8 @@ final class QRScannerViewController: UIViewController, AVCaptureMetadataOutputOb
         let label = UILabel()
         label.text = LocalizationManager.shared.localizedString(for: "scan_qr_prompt")
         label.textColor = .white
-        label.font = .systemFont(ofSize: 14, weight: .medium)
+        label.font = UIFont.preferredFont(forTextStyle: .subheadline)
+        label.adjustsFontForContentSizeCategory = true
         label.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(label)
         NSLayoutConstraint.activate([
@@ -115,7 +118,50 @@ final class QRScannerViewController: UIViewController, AVCaptureMetadataOutputOb
 
         hasScanned = true
         captureSession?.stopRunning()
+
+        // Haptic feedback — heavy impact for clear tactile confirmation
+        UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+
+        // System sound for audio confirmation
+        AudioServicesPlaySystemSound(1057)
+
+        // Visual success feedback — green flash overlay
+        showSuccessOverlay()
+
+        // VoiceOver announcement
+        UIAccessibility.post(notification: .announcement,
+            argument: "QR riconosciuto. Caricamento punto di interesse...")
+
         onScan?(value)
+    }
+
+    private func showSuccessOverlay() {
+        let overlay = UIView(frame: view.bounds)
+        overlay.backgroundColor = UIColor.systemGreen.withAlphaComponent(0.3)
+        overlay.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        view.addSubview(overlay)
+        successOverlay = overlay
+
+        // Checkmark icon
+        let checkmark = UIImageView(image: UIImage(systemName: "checkmark.circle.fill"))
+        checkmark.tintColor = .white
+        checkmark.translatesAutoresizingMaskIntoConstraints = false
+        checkmark.contentMode = .scaleAspectFit
+        overlay.addSubview(checkmark)
+        NSLayoutConstraint.activate([
+            checkmark.centerXAnchor.constraint(equalTo: overlay.centerXAnchor),
+            checkmark.centerYAnchor.constraint(equalTo: overlay.centerYAnchor),
+            checkmark.widthAnchor.constraint(equalToConstant: 80),
+            checkmark.heightAnchor.constraint(equalToConstant: 80)
+        ])
+
+        // Fade out after 0.5s
+        UIView.animate(withDuration: 0.5, delay: 0.5, options: .curveEaseOut) {
+            overlay.alpha = 0
+        } completion: { _ in
+            overlay.removeFromSuperview()
+            self.successOverlay = nil
+        }
     }
 
     override func viewWillDisappear(_ animated: Bool) {

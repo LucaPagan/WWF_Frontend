@@ -29,6 +29,7 @@ struct POIModalView: View {
     let poi: POI
     var onContinue: (() -> Void)? = nil
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject var accessibilityPrefs: AccessibilityPreferences
     @StateObject private var voiceService = VoiceService.shared
     @ObservedObject private var localizer = LocalizationManager.shared
 
@@ -141,7 +142,7 @@ struct POIModalView: View {
                             
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(poi.localizedName)
-                                    .font(Font.custom("Georgia", size: 20).weight(.bold))
+                                    .font(Font.custom("Georgia", size: 20, relativeTo: .title3).weight(.bold))
                                     .foregroundColor(.white)
                                 
                                 Text(localizer.localizedString(for: "poi_type_" + poi.type.rawValue))
@@ -191,7 +192,7 @@ struct POIModalView: View {
                                 if voiceService.isSpeaking {
                                     voiceService.stop()
                                 } else {
-                                    voiceService.speak(poi.localizedDescription, languageCode: localizer.preferredLanguage)
+                                    voiceService.speak(poi.adaptiveDescription(kidsMode: accessibilityPrefs.kidsMode, easyReadMode: accessibilityPrefs.easyReadMode), languageCode: localizer.preferredLanguage)
                                 }
                             } label: {
                                 Image(systemName: voiceService.isSpeaking ? "stop.circle.fill" : "speaker.wave.2.circle.fill")
@@ -200,7 +201,7 @@ struct POIModalView: View {
                             }
                         }
                         
-                        Text(poi.localizedDescription)
+                        Text(poi.adaptiveDescription(kidsMode: accessibilityPrefs.kidsMode, easyReadMode: accessibilityPrefs.easyReadMode))
                             .font(WWFDesign.Typography.trailDesc)
                             .foregroundColor(.secondary)
                             .lineSpacing(4)
@@ -262,7 +263,7 @@ struct POIModalView: View {
                 FullScreenGalleryView(items: galleryItems, selectedItemId: $selectedGalleryItemId)
             }
             .onDisappear {
-                voiceService.stop()
+                // Removed voiceService.stop() to allow audio to play in background
             }
         }
     }
@@ -538,7 +539,7 @@ struct MediaDetailView: View {
                     case .model3d:
                         Model3DView(url: localURL)
                             .padding()
-                    case .text:
+                    case .text, .transcript:
                         if let textStr = content.text(forLanguage: LocalizationManager.shared.preferredLanguage) {
                             ScrollView {
                                 Text(textStr)
@@ -563,7 +564,7 @@ struct MediaDetailView: View {
                         case .model3d:
                             Model3DView(url: remoteURL)
                                 .padding()
-                        case .text:
+                        case .text, .transcript:
                             if let textStr = content.text(forLanguage: LocalizationManager.shared.preferredLanguage) {
                                 ScrollView {
                                     Text(textStr)
@@ -575,7 +576,7 @@ struct MediaDetailView: View {
                                 errorView
                             }
                         }
-                    } else if content.contentType == .text, let textStr = content.text(forLanguage: LocalizationManager.shared.preferredLanguage) {
+                    } else if (content.contentType == .text || content.contentType == .transcript), let textStr = content.text(forLanguage: LocalizationManager.shared.preferredLanguage) {
                         ScrollView {
                             Text(textStr)
                                 .font(.body)

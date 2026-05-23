@@ -28,6 +28,10 @@ final class POI: @unchecked Sendable {
     var createdAt: Date
     var updatedAt: Date
     var needsSync: Bool
+    var iconName: String
+    var numericCode: String
+    var descriptionKids: String?
+    var descriptionEasyRead: String?
 
     @Transient var type: POIType {
         get { POIType(rawValue: typeRawValue) ?? .landmark }
@@ -40,6 +44,16 @@ final class POI: @unchecked Sendable {
 
     @Transient var localizedDescription: String {
         LocalizationManager.shared.localizedField(table: "pois", recordId: id, fieldName: "poi_description", fallback: poiDescription)
+    }
+
+    func adaptiveDescription(kidsMode: Bool, easyReadMode: Bool) -> String {
+        if easyReadMode, let er = descriptionEasyRead, !er.isEmpty {
+            return er
+        }
+        if kidsMode, let kids = descriptionKids, !kids.isEmpty {
+            return kids
+        }
+        return localizedDescription
     }
 
 
@@ -55,6 +69,10 @@ final class POI: @unchecked Sendable {
         photoData: Data? = nil,
         isStartPoint: Bool = false,
         isActive: Bool = true,
+        iconName: String? = nil,
+        numericCode: String? = nil,
+        descriptionKids: String? = nil,
+        descriptionEasyRead: String? = nil,
         fixedID: UUID? = nil
     ) {
         let newID = fixedID ?? UUID()
@@ -71,6 +89,10 @@ final class POI: @unchecked Sendable {
         self.qrPayload = "ASTRONI_POI_\(newID.uuidString)"
         self.isStartPoint = isStartPoint
         self.isActive = isActive
+        self.iconName = iconName ?? type.icon
+        self.numericCode = numericCode ?? String(format: "%06d", Int.random(in: 100000...999999))
+        self.descriptionKids = descriptionKids
+        self.descriptionEasyRead = descriptionEasyRead
         self.createdAt = Date()
         self.updatedAt = Date()
         self.needsSync = true
@@ -88,6 +110,10 @@ final class POI: @unchecked Sendable {
         if let qr = data["qr_payload"] as? String { qrPayload = qr }
         if let sp = data["is_start_point"] as? Bool { isStartPoint = sp }
         if let active = data["is_active"] as? Bool { isActive = active }
+        if let icon = data["icon_name"] as? String { iconName = icon }
+        if let code = data["numeric_code"] as? String { numericCode = code }
+        descriptionKids = data["description_kids"] as? String
+        descriptionEasyRead = data["description_easy_read"] as? String
         needsSync = false
     }
 }

@@ -16,6 +16,7 @@ struct TrailDetailView: View {
     @State private var isManagingPackages = false
     @EnvironmentObject var downloadManager: DownloadManager
     @ObservedObject private var localizer = LocalizationManager.shared
+    @EnvironmentObject var accessibilityPrefs: AccessibilityPreferences
 
     private var difficulty: TrailDifficulty {
         trail.difficulty ?? .easy
@@ -73,6 +74,7 @@ struct TrailDetailView: View {
                             .foregroundColor(WWFDesign.Colors.leafGreen.opacity(0.06))
                             .rotationEffect(.degrees(-25))
                             .offset(x: UIScreen.main.bounds.width - 150, y: 30)
+                            .accessibilityHidden(true)
                         
                         // Contenuto testuale (solo titolo) allineato in basso
                         VStack(alignment: .leading, spacing: 0) {
@@ -80,8 +82,8 @@ struct TrailDetailView: View {
                             
                             // Titolo Percorso
                             Text(trail.localizedName)
-                                .font(Font.custom("Georgia", size: 30).weight(.bold))
-                                .foregroundColor(Color(red: 0.941, green: 0.929, blue: 0.902)) // #f0ede6
+                                .font(Font.custom("Georgia", size: 30, relativeTo: .largeTitle).weight(.bold))
+                                .foregroundColor(Color(red: 0.941, green: 0.929, blue: 0.902))
                                 .shadow(color: .black.opacity(0.2), radius: 4, x: 0, y: 2)
                         }
                         .padding(20)
@@ -104,12 +106,14 @@ struct TrailDetailView: View {
                                         .clipShape(Circle())
                                     
                                     Image(systemName: "chevron.left")
-                                        .font(.system(size: 16, weight: .semibold))
+                                        .font(.headline)
                                         .foregroundColor(WWFDesign.Colors.leafLight)
-                                        .offset(x: -1) // Correzione ottica per centratura del chevron
+                                        .offset(x: -1)
                                 }
-                                .frame(width: 40, height: 40)
+                                .frame(width: 44, height: 44)
+                                .contentShape(Circle())
                             }
+                            .accessibilityLabel("Torna indietro")
                             
                             Spacer()
                             
@@ -142,7 +146,7 @@ struct TrailDetailView: View {
                         // Durata
                         HStack(spacing: 6) {
                             Image(systemName: "clock.fill")
-                                .font(.system(size: 12))
+                                .font(.caption)
                                 .foregroundColor(WWFDesign.Colors.forestLight)
                             Text("\(trail.estimatedMinutes ?? 60) min")
                                 .font(WWFDesign.Typography.chipLabel)
@@ -159,7 +163,7 @@ struct TrailDetailView: View {
                         // Tappe
                         HStack(spacing: 6) {
                             Image(systemName: "mappin.and.ellipse")
-                                .font(.system(size: 12))
+                                .font(.caption)
                                 .foregroundColor(WWFDesign.Colors.forestLight)
                             Text("\(trail.steps.count) \(localizer.localizedString(for: "steps_label"))")
                                 .font(WWFDesign.Typography.chipLabel)
@@ -183,7 +187,7 @@ struct TrailDetailView: View {
                             .font(WWFDesign.Typography.sectionTitle)
                             .foregroundColor(WWFDesign.Colors.forestDark)
                         
-                        Text(trail.localizedDescription)
+                        Text(trail.adaptiveDescription(kidsMode: accessibilityPrefs.kidsMode, easyReadMode: accessibilityPrefs.easyReadMode))
                             .font(WWFDesign.Typography.trailDesc)
                             .foregroundColor(.secondary)
                             .lineSpacing(4)
@@ -203,13 +207,13 @@ struct TrailDetailView: View {
                     // Warning / Offline mode info
                     HStack(alignment: .top, spacing: 12) {
                         Image(systemName: "wifi.slash")
-                            .font(.system(size: 16, weight: .semibold))
+                            .font(.headline)
                             .foregroundColor(WWFDesign.Colors.warningText)
                             .padding(.top, 1)
 
                         VStack(alignment: .leading, spacing: 4) {
                             Text(localizer.localizedString(for: "offline_mode"))
-                                .font(.system(size: 13, weight: .semibold))
+                                .font(.footnote.weight(.semibold))
                                 .foregroundColor(WWFDesign.Colors.warningText)
 
                             Text(localizer.localizedString(for: "offline_navigation_desc"))
@@ -270,7 +274,7 @@ struct TrailDetailView: View {
                                 startTrail = true
                             } label: {
                                 Label(localizer.localizedString(for: "continue_offline"), systemImage: "play.fill")
-                                    .font(.system(size: 15, weight: .semibold))
+                                    .font(.subheadline.weight(.semibold))
                                     .foregroundColor(.white)
                                     .frame(maxWidth: .infinity)
                                     .padding(.vertical, 14)
@@ -284,7 +288,7 @@ struct TrailDetailView: View {
                                 showDownloadOptions = true
                             } label: {
                                 Label(localizer.localizedString(for: "manage_packages"), systemImage: "arrow.down.circle.fill")
-                                    .font(.system(size: 13, weight: .medium))
+                                    .font(.footnote.weight(.medium))
                                     .foregroundColor(WWFDesign.Colors.forestDark)
                                     .frame(maxWidth: .infinity)
                                     .padding(.vertical, 10)
@@ -301,7 +305,7 @@ struct TrailDetailView: View {
                                 showDownloadOptions = true
                             } label: {
                                 Label(localizer.localizedString(for: "download_and_start"), systemImage: "icloud.and.arrow.down.fill")
-                                    .font(.system(size: 15, weight: .semibold))
+                                    .font(.subheadline.weight(.semibold))
                                     .foregroundColor(.white)
                                     .frame(maxWidth: .infinity)
                                     .padding(.vertical, 14)
@@ -320,12 +324,14 @@ struct TrailDetailView: View {
                 ActiveTrailView(trail: trail)
             }
             .sheet(isPresented: $showDownloadOptions) {
-                DownloadSelectionView(trail: trail)
-                    .onDisappear {
-                        if !isManagingPackages {
+                DownloadSelectionView(trail: trail) {
+                    showDownloadOptions = false
+                    if !isManagingPackages {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                             startTrail = true
                         }
                     }
+                }
             }
         }
     }
@@ -347,7 +353,7 @@ struct TrailStepRowView: View {
                         .fill(WWFDesign.Colors.forestLight)
                         .frame(width: 28, height: 28)
                     Text("\(index + 1)")
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(.caption.weight(.semibold))
                         .foregroundColor(.white)
                 }
                 
@@ -377,6 +383,8 @@ struct TrailStepRowView: View {
             
             Spacer()
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Step \(index + 1): \(step.poi?.localizedName ?? ""). \(step.instructions). \(step.distanceMeters) metri, circa \(step.estimatedMinutes) minuti.")
     }
 }
 

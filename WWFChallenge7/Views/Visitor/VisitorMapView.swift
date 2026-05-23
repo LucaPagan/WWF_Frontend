@@ -14,6 +14,7 @@ struct VisitorMapView: UIViewRepresentable {
     let currentStepPOIId: UUID?
     let currentNormalizedPosition: CGPoint
     let navigationState: TrailNavigationState
+    var isDashboard: Bool = false
 
     func makeCoordinator() -> Coordinator {
         Coordinator(self)
@@ -32,55 +33,58 @@ struct VisitorMapView: UIViewRepresentable {
         
         // Add content insets so the user can pan the map freely past the edges.
         // The bottom inset is large to account for the navigation card overlay.
-        scrollView.contentInset = UIEdgeInsets(top: 40, left: 20, bottom: 320, right: 20)
+        if isDashboard {
+            scrollView.contentInset = .zero
+        } else {
+            scrollView.contentInset = UIEdgeInsets(top: 40, left: 20, bottom: 320, right: 20)
+        }
 
         let container = UIView()
         container.backgroundColor = .clear
+        container.clipsToBounds = true
         context.coordinator.containerView = container
         scrollView.addSubview(container)
 
-        // Setup the map pieces as requested
-        let pieceNames = [
-            "astroni_map_piece_1",
-            "astroni_map_piece_2",
-            "astroni_map_piece_3",
-            "astroni_map_piece_4",
-            "astroni_map_piece_5",
-            "astroni_map_piece_6"
-        ]
+        var mapImageViews: [UIImageView] = []
+        var loadedPieces: [UIImage] = []
+        var missingPiece = false
         
-        var pieceImageViews: [UIImageView] = []
-        var baseImage: UIImage? = nil
-        
-        for name in pieceNames {
-            if let img = UIImage(named: name) {
-                if baseImage == nil {
-                    baseImage = img
-                }
-                let imageView = UIImageView(image: img)
-                imageView.contentMode = .scaleAspectFit
-                imageView.isUserInteractionEnabled = false
-                container.addSubview(imageView)
-                pieceImageViews.append(imageView)
+        for i in 1...7 {
+            if let piece = UIImage(named: "astroni_map_piece_\(i)") {
+                loadedPieces.append(piece)
+            } else {
+                missingPiece = true
+                break
             }
         }
         
-        // Fallback to "astroni_map" if pieces are not yet loaded in Assets.xcassets
-        if pieceImageViews.isEmpty, let fallbackImg = UIImage(named: "astroni_map") {
-            baseImage = fallbackImg
-            let imageView = UIImageView(image: fallbackImg)
-            imageView.contentMode = .scaleAspectFit
-            imageView.isUserInteractionEnabled = false
-            container.addSubview(imageView)
-            pieceImageViews.append(imageView)
+        let isUsingPieces: Bool
+        
+        if !missingPiece && loadedPieces.count == 7 {
+            isUsingPieces = true
+            for piece in loadedPieces {
+                let imageView = UIImageView(image: piece)
+                imageView.contentMode = .scaleToFill
+                imageView.isUserInteractionEnabled = false
+                container.addSubview(imageView)
+                mapImageViews.append(imageView)
+            }
+        } else {
+            isUsingPieces = false
+            if let fullMapImg = UIImage(named: "astroni_map") {
+                let imageView = UIImageView(image: fullMapImg)
+                imageView.contentMode = .scaleToFill
+                imageView.isUserInteractionEnabled = false
+                container.addSubview(imageView)
+                mapImageViews.append(imageView)
+            }
         }
         
-        // Final fallback if absolutely nothing is loaded (creating dummy map sizing bounds)
-        if baseImage == nil {
-            baseImage = UIImage(systemName: "map")
-        }
+        let baseImage = UIImage(named: "astroni_map") ?? UIImage(systemName: "map")
         
-        context.coordinator.pieceImageViews = pieceImageViews
+        context.coordinator.pieceImageViews = mapImageViews
+        context.coordinator.baseImage = baseImage
+        context.coordinator.isUsingPieces = isUsingPieces
 
         if let imgToUse = baseImage {
             DispatchQueue.main.async {
@@ -88,11 +92,25 @@ struct VisitorMapView: UIViewRepresentable {
             }
         }
 
+        // Accessibility: label the map for VoiceOver
+        scrollView.isAccessibilityElement = false
+        scrollView.accessibilityLabel = "Mappa del percorso \(trail.localizedName)"
+        container.isAccessibilityElement = false
+        container.accessibilityContainerType = .semanticGroup
+
         return scrollView
     }
 
     func updateUIView(_ scrollView: UIScrollView, context: Context) {
         context.coordinator.parent = self
+        
+        // If layout was not setup yet (e.g. because bounds were zero in makeUIView), set it up now!
+        if !context.coordinator.isLayoutSetup, scrollView.bounds.width > 0, scrollView.bounds.height > 0 {
+            if let imgToUse = context.coordinator.baseImage {
+                context.coordinator.setupLayout(in: scrollView, image: imgToUse)
+            }
+        }
+        
         context.coordinator.refreshMarkers(in: scrollView)
         context.coordinator.animateToCurrentPosition(in: scrollView)
     }
@@ -103,6 +121,9 @@ struct VisitorMapView: UIViewRepresentable {
         var parent: VisitorMapView
         weak var containerView: UIView?
         var pieceImageViews: [UIImageView] = []
+        var baseImage: UIImage?
+        var isLayoutSetup = false
+        var isUsingPieces = false
         private var hasAnimatedEntrance = false
         var lastTargetPosition: CGPoint?
         private var userDotLayer: CALayer?
@@ -113,10 +134,15 @@ struct VisitorMapView: UIViewRepresentable {
         }
 
         func setupLayout(in scrollView: UIScrollView, image: UIImage) {
+            guard !isLayoutSetup else { return }
             guard let container = containerView else { return }
 
             let screenW = scrollView.bounds.width
             let screenH = scrollView.bounds.height
+            
+            // Only proceed if we have valid dimensions
+            guard screenW > 0, screenH > 0 else { return }
+            isLayoutSetup = true
             let imageWidth = max(image.size.width, 1.0)
             let imgRatio = image.size.height / imageWidth
 
@@ -125,7 +151,7 @@ struct VisitorMapView: UIViewRepresentable {
 
             container.frame = CGRect(x: 0, y: 0, width: mapW, height: mapH)
             
-            // Set frame for all map pieces
+            // Set frame for map image view(s) — always full size, matching container
             for pieceView in pieceImageViews {
                 pieceView.frame = CGRect(x: 0, y: 0, width: mapW, height: mapH)
             }
@@ -139,15 +165,21 @@ struct VisitorMapView: UIViewRepresentable {
             scrollView.minimumZoomScale = max(0.3, fitScale)
             scrollView.maximumZoomScale = 6.0
             
-            // Set a comfortable initial zoom (e.g. 2x the fit scale, capped at 3.0)
-            let initialZoom = min(max(fitScale * 2.0, 1.5), 3.0)
-            scrollView.zoomScale = initialZoom
+            if parent.isDashboard {
+                // Dashboard: fill the screen height, showing the map centered
+                let fillScale = max(scaleToFitH, scaleToFitW) * 0.85
+                scrollView.zoomScale = fillScale
+            } else {
+                // Navigation: comfortable initial zoom (2x the fit scale, capped at 3.0)
+                let initialZoom = min(max(fitScale * 2.0, 1.5), 3.0)
+                scrollView.zoomScale = initialZoom
+            }
 
             centerContent(in: scrollView)
             refreshMarkers(in: scrollView)
             animateToCurrentPosition(in: scrollView, force: true)
             
-            // Beautiful piece animation!
+            // Smooth entrance animation
             animatePiecesEntrance(screenHeight: screenH)
         }
 
@@ -155,26 +187,21 @@ struct VisitorMapView: UIViewRepresentable {
             guard !hasAnimatedEntrance else { return }
             hasAnimatedEntrance = true
 
-            // Put all pieces up, transparent, scaled up and slightly rotated for a premium physical effect
+            // Set initial state: transforms are identity to prevent layout alignment corruption if canceled, alpha is transparent
             for pieceView in pieceImageViews {
-                pieceView.transform = CGAffineTransform(translationX: 0, y: -screenHeight * 1.2)
-                    .scaledBy(x: 1.15, y: 1.15)
-                    .rotated(by: CGFloat.pi * -0.04) // Slight organic tilt
+                pieceView.transform = .identity
                 pieceView.alpha = 0.0
             }
 
-            // Animate each piece down sequentially
+            // Animate each piece fade-in sequentially for a premium staggered composition effect
             for (index, pieceView) in pieceImageViews.enumerated() {
-                let delay = Double(index) * 0.45 // Premium staggered delay
+                let delay = Double(index) * 0.35
                 
                 UIView.animate(
-                    withDuration: 1.4,
+                    withDuration: 0.8,
                     delay: delay,
-                    usingSpringWithDamping: 0.72, // Physical soft spring bounce
-                    initialSpringVelocity: 0.2,
                     options: [.curveEaseOut, .allowUserInteraction],
                     animations: {
-                        pieceView.transform = .identity
                         pieceView.alpha = 1.0
                     },
                     completion: nil
@@ -198,25 +225,49 @@ struct VisitorMapView: UIViewRepresentable {
             let boundsSize = scrollView.bounds.size
             var frameToCenter = container.frame
 
-            let bottomOverlayHeight: CGFloat = 300
-            let visibleHeight = max(0, boundsSize.height - bottomOverlayHeight)
-
+            // Horizontal centering: if content is narrower than screen, center it
             if frameToCenter.size.width < boundsSize.width {
-                frameToCenter.origin.x = (boundsSize.width - frameToCenter.size.width) / 2
+                frameToCenter.origin.x = (boundsSize.width - frameToCenter.size.width) / 2.0
             } else {
                 frameToCenter.origin.x = 0
             }
-            
-            if frameToCenter.size.height < visibleHeight {
-                frameToCenter.origin.y = (visibleHeight - frameToCenter.size.height) / 2
+
+            // Vertical centering
+            if parent.isDashboard {
+                // Dashboard mode: center the map vertically in the full screen
+                if frameToCenter.size.height < boundsSize.height {
+                    frameToCenter.origin.y = (boundsSize.height - frameToCenter.size.height) * 0.35
+                } else {
+                    frameToCenter.origin.y = 0
+                }
             } else {
-                frameToCenter.origin.y = 0
+                // Navigation mode: offset for the bottom panel (~200px)
+                let bottomOverlayHeight: CGFloat = 200
+                let visibleHeight = max(0, boundsSize.height - bottomOverlayHeight)
+                if frameToCenter.size.height < visibleHeight {
+                    frameToCenter.origin.y = (visibleHeight - frameToCenter.size.height) / 2.0
+                } else {
+                    frameToCenter.origin.y = 0
+                }
             }
-            
+
             container.frame = frameToCenter
         }
 
         func animateToCurrentPosition(in scrollView: UIScrollView, force: Bool = false) {
+            if parent.isDashboard {
+                // Dashboard: center the map content in the scroll view
+                let contentSize = scrollView.contentSize
+                let boundsSize = scrollView.bounds.size
+                
+                // Calculate offset to center content
+                let offsetX = max(0, (contentSize.width - boundsSize.width) / 2)
+                let offsetY = max(0, ((contentSize.height - boundsSize.height) / 2) + 120)
+                
+                scrollView.setContentOffset(CGPoint(x: offsetX, y: offsetY), animated: !force)
+                return
+            }
+
             let newPos = parent.currentNormalizedPosition
             if !force, let lastPos = lastTargetPosition, lastPos == newPos {
                 return
@@ -229,23 +280,26 @@ struct VisitorMapView: UIViewRepresentable {
             let screenH = scrollView.bounds.height
             let currentScale = scrollView.zoomScale
             
-            let mapW = container.bounds.width / currentScale
-            let mapH = container.bounds.height / currentScale
+            let mapW = container.bounds.width
+            let mapH = container.bounds.height
             
-            let cx = newPos.x * mapW * currentScale
-            let cy = newPos.y * mapH * currentScale
+            let cx = newPos.x * mapW
+            let cy = newPos.y * mapH
             
             let insets = scrollView.contentInset
+            let totalContentW = mapW * currentScale
+            let totalContentH = mapH * currentScale
             let minOffsetX = -insets.left
             let minOffsetY = -insets.top
-            let maxOffsetX = max(minOffsetX, mapW * currentScale - screenW + insets.right)
-            let maxOffsetY = max(minOffsetY, mapH * currentScale - screenH + insets.bottom)
+            let maxOffsetX = max(minOffsetX, totalContentW - screenW + insets.right)
+            let maxOffsetY = max(minOffsetY, totalContentH - screenH + insets.bottom)
             
-            // Offset the vertical center to account for the bottom navigation panel
-            let visibleCenterY = (screenH - 300) / 2
+            // Offset the vertical center to account for the bottom navigation panel (~200px)
+            let bottomPanel: CGFloat = 200
+            let visibleCenterY = (screenH - bottomPanel) / 2
             
-            let offsetX = max(minOffsetX, min(cx - screenW / 2, maxOffsetX))
-            let offsetY = max(minOffsetY, min(cy - visibleCenterY, maxOffsetY))
+            let offsetX = max(minOffsetX, min(cx * currentScale - screenW / 2, maxOffsetX))
+            let offsetY = max(minOffsetY, min(cy * currentScale - visibleCenterY, maxOffsetY))
             
             let targetOffset = CGPoint(x: offsetX, y: offsetY)
             
@@ -307,17 +361,41 @@ struct VisitorMapView: UIViewRepresentable {
             let sortedSteps = parent.trail.sortedSteps
             guard !sortedSteps.isEmpty else { return }
 
-            for step in sortedSteps {
+            for (index, step) in sortedSteps.enumerated() {
                 let isCompleted = parent.completedPOIIds.contains(step.poi?.id ?? UUID())
                 let isNextActive = step.poi?.id == parent.currentStepPOIId
                 
-                // ONLY draw if pathGeometry exists. This forces admins to map trails.
-                guard let geom = step.pathGeometry, !geom.isEmpty else { continue }
+                var points: [CGPoint] = []
                 
-                let coords = PolylineCodec.decode(geom)
+                if let geom = step.pathGeometry, !geom.isEmpty {
+                    // Use the drawn path geometry
+                    let coords = PolylineCodec.decode(geom)
+                    points = coords.map { CGPoint(x: $0.latitude * imageSize.width, y: $0.longitude * imageSize.height) }
+                } else {
+                    // Fallback: straight line from previous POI (or start) to this POI
+                    let startPoint: CGPoint
+                    if index == 0 {
+                        startPoint = CGPoint(
+                            x: parent.trail.startX * imageSize.width,
+                            y: parent.trail.startY * imageSize.height
+                        )
+                    } else {
+                        let prevPOI = sortedSteps[index - 1].poi
+                        startPoint = CGPoint(
+                            x: (prevPOI?.x ?? 0) * imageSize.width,
+                            y: (prevPOI?.y ?? 0) * imageSize.height
+                        )
+                    }
+                    let endPoint = CGPoint(
+                        x: (step.poi?.x ?? 0) * imageSize.width,
+                        y: (step.poi?.y ?? 0) * imageSize.height
+                    )
+                    points = [startPoint, endPoint]
+                }
+                
+                guard points.count >= 2 else { continue }
+                
                 let path = UIBezierPath()
-                let points = coords.map { CGPoint(x: $0.latitude * imageSize.width, y: $0.longitude * imageSize.height) }
-                
                 if let first = points.first {
                     path.move(to: first)
                     for i in 1..<points.count {
@@ -349,8 +427,8 @@ struct VisitorMapView: UIViewRepresentable {
                     pathLayer.shadowOpacity = 0.8
                     pathLayer.shadowOffset = .zero
                 } else {
-                    // Future steps: Very faint dotted line
-                    pathLayer.strokeColor = UIColor(WWFDesign.Colors.forestLight).withAlphaComponent(0.15).cgColor
+                    // Future steps: Dotted line
+                    pathLayer.strokeColor = UIColor(WWFDesign.Colors.forestLight).withAlphaComponent(0.8).cgColor
                     pathLayer.lineWidth = 3
                     pathLayer.lineDashPattern = [4, 4]
                 }
@@ -371,6 +449,7 @@ struct VisitorMapView: UIViewRepresentable {
             }()
 
             let diameter: CGFloat = 30 / zoomScale
+            let pinTailExtra: CGFloat = diameter * 0.45  // Teardrop tail height
 
             let marker = VisitorMarkerUIView(
                 diameter: diameter,
@@ -384,16 +463,23 @@ struct VisitorMapView: UIViewRepresentable {
             let totalW = max(diameter * 3, 80 / zoomScale)
             let labelH: CGFloat = 16 / zoomScale
             let gap: CGFloat = 4 / zoomScale
-            let totalH = diameter + gap + labelH + (isAtStart ? 14 / zoomScale : 0)
+            let pinH = diameter + pinTailExtra
+            let totalH = pinH + gap + labelH + (isAtStart ? 14 / zoomScale : 0)
 
+            // Position so the pin tip points at the coordinate (cx, cy)
             marker.frame = CGRect(
                 x: cx - totalW / 2,
-                y: cy - diameter / 2 - (isAtStart ? 7 / zoomScale : 0),
+                y: cy - pinH - (isAtStart ? 7 / zoomScale : 0),
                 width: totalW,
                 height: totalH
             )
 
             container.addSubview(marker)
+
+            // UIKit accessibility for start marker
+            marker.isAccessibilityElement = true
+            marker.accessibilityLabel = "Punto di partenza: \(parent.trail.startPointName)"
+            marker.accessibilityTraits = .staticText
         }
 
         // MARK: - POI Marker
@@ -410,6 +496,7 @@ struct VisitorMapView: UIViewRepresentable {
             let cy = poi.y * imageSize.height
 
             let diameter: CGFloat = 28 / zoomScale
+            let pinTailExtra: CGFloat = diameter * 0.45  // Teardrop tail height
 
             let fillColor: UIColor = {
                 if isCompleted { return .gray }
@@ -429,16 +516,23 @@ struct VisitorMapView: UIViewRepresentable {
             )
 
             let totalW = diameter * 2.5
-            let totalH = diameter + (isCurrent ? 16 / zoomScale : 0)
+            let pinH = diameter + pinTailExtra
+            let totalH = pinH + (isCurrent ? 16 / zoomScale : 0)
 
+            // Position so the pin tip points at the coordinate (cx, cy)
             marker.frame = CGRect(
                 x: cx - totalW / 2,
-                y: cy - diameter / 2 - (isCurrent ? 8 / zoomScale : 0),
+                y: cy - pinH - (isCurrent ? 8 / zoomScale : 0),
                 width: totalW,
                 height: totalH
             )
 
             container.addSubview(marker)
+
+            // UIKit accessibility for POI markers
+            marker.isAccessibilityElement = true
+            marker.accessibilityLabel = "\(poi.localizedName), \(isCompleted ? "completato" : isCurrent ? "prossima tappa" : "da visitare")"
+            marker.accessibilityTraits = .button
         }
 
         // MARK: - User Location Indicator
@@ -506,7 +600,7 @@ struct VisitorMapView: UIViewRepresentable {
     }
 }
 
-// MARK: - VisitorMarkerUIView (Custom CoreGraphics rendering)
+// MARK: - VisitorMarkerUIView (Teardrop Pin — CoreGraphics rendering)
 
 final class VisitorMarkerUIView: UIView {
     private let diameter: CGFloat
@@ -515,6 +609,10 @@ final class VisitorMarkerUIView: UIView {
     private let zoomScale: CGFloat
     private let isHighlighted: Bool
     private let label: String?
+
+    /// The total height of the teardrop pin (circle head + pointed tail).
+    /// The tail adds ~40% of the diameter below the circle.
+    private var pinTotalHeight: CGFloat { diameter + diameter * 0.45 }
 
     init(
         diameter: CGFloat,
@@ -541,10 +639,23 @@ final class VisitorMarkerUIView: UIView {
         guard let ctx = UIGraphicsGetCurrentContext() else { return }
 
         let circleCenterX = rect.midX
-        let circleCenterY = diameter / 2 + (isHighlighted ? 7 / zoomScale : 0)
+        let highlightOffset: CGFloat = isHighlighted ? 7 / zoomScale : 0
+        let circleCenterY = diameter / 2 + highlightOffset
         let radius = diameter / 2
 
-        // Highlight ring
+        // Tip of the pin (bottom point)
+        let tipY = circleCenterY + radius + diameter * 0.45
+
+        // The angle where the circle meets the tail (~40° from vertical axis)
+        let tailAngle: CGFloat = .pi * 0.28
+
+        // Tangent points on the circle where the tail begins
+        let leftTX = circleCenterX - radius * sin(tailAngle)
+        let leftTY = circleCenterY + radius * cos(tailAngle)
+        let rightTX = circleCenterX + radius * sin(tailAngle)
+        let rightTY = circleCenterY + radius * cos(tailAngle)
+
+        // Highlight ring (pulsing glow behind the pin)
         if isHighlighted {
             let highlightPadding: CGFloat = 7 / zoomScale
             ctx.setFillColor(fillColor.withAlphaComponent(0.25).cgColor)
@@ -560,31 +671,60 @@ final class VisitorMarkerUIView: UIView {
         ctx.setShadow(
             offset: CGSize(width: 0, height: 2 / zoomScale),
             blur: 4 / zoomScale,
-            color: UIColor.black.withAlphaComponent(0.4).cgColor
+            color: UIColor.black.withAlphaComponent(0.45).cgColor
         )
 
-        // Filled circle
-        ctx.setFillColor(fillColor.cgColor)
-        ctx.addArc(
-            center: CGPoint(x: circleCenterX, y: circleCenterY),
+        // Draw teardrop pin path
+        let pinPath = UIBezierPath()
+
+        // Start at the right tangent point
+        pinPath.move(to: CGPoint(x: rightTX, y: rightTY))
+
+        // Arc from right tangent, going counter-clockwise over the top, to left tangent
+        // Start angle: measured from positive-x axis.
+        let startAngle = CGFloat.pi / 2 - tailAngle
+        let endAngle = CGFloat.pi / 2 + tailAngle
+        pinPath.addArc(
+            withCenter: CGPoint(x: circleCenterX, y: circleCenterY),
             radius: radius,
-            startAngle: 0, endAngle: .pi * 2, clockwise: false
+            startAngle: startAngle,
+            endAngle: endAngle,
+            clockwise: true
         )
-        ctx.fillPath()
+
+        // Curve from left tangent to tip
+        pinPath.addQuadCurve(
+            to: CGPoint(x: circleCenterX, y: tipY),
+            controlPoint: CGPoint(
+                x: circleCenterX - radius * 0.20,
+                y: leftTY + (tipY - leftTY) * 0.55
+            )
+        )
+
+        // Curve from tip back to right tangent
+        pinPath.addQuadCurve(
+            to: CGPoint(x: rightTX, y: rightTY),
+            controlPoint: CGPoint(
+                x: circleCenterX + radius * 0.20,
+                y: rightTY + (tipY - rightTY) * 0.55
+            )
+        )
+
+        pinPath.close()
+
+        // Fill the pin
+        ctx.setFillColor(fillColor.cgColor)
+        pinPath.fill()
         ctx.setShadow(offset: .zero, blur: 0, color: nil)
 
-        // White border
-        ctx.setStrokeColor(UIColor.white.withAlphaComponent(0.5).cgColor)
-        ctx.setLineWidth(1 / zoomScale)
-        ctx.addArc(
-            center: CGPoint(x: circleCenterX, y: circleCenterY),
-            radius: radius - 0.5 / zoomScale,
-            startAngle: 0, endAngle: .pi * 2, clockwise: false
-        )
-        ctx.strokePath()
+        // White border on the pin
+        ctx.setStrokeColor(UIColor.white.withAlphaComponent(0.6).cgColor)
+        ctx.setLineWidth(1.2 / zoomScale)
+        pinPath.lineWidth = 1.2 / zoomScale
+        pinPath.stroke()
 
-        // Icon
-        let iconPtSize = max(6, (diameter * zoomScale * 0.35) / zoomScale)
+        // Icon (centered in the circle head, not the tail)
+        let iconPtSize = max(6, (diameter * zoomScale * 0.38) / zoomScale)
         let config = UIImage.SymbolConfiguration(pointSize: iconPtSize, weight: .bold)
         if let icon = UIImage(systemName: iconName, withConfiguration: config)?
             .withTintColor(.white, renderingMode: .alwaysOriginal) {
@@ -596,7 +736,7 @@ final class VisitorMarkerUIView: UIView {
             icon.draw(in: CGRect(origin: iconOrigin, size: iconSize))
         }
 
-        // Label rendering
+        // Label rendering (below the pin tip)
         if let label = label {
             let fontSize: CGFloat = 9 / zoomScale
             let paddingH: CGFloat = 5 / zoomScale
@@ -616,7 +756,7 @@ final class VisitorMarkerUIView: UIView {
             let bgW = labelSize.width + paddingH * 2
             let bgH = labelSize.height + paddingV * 2
             let bgX = circleCenterX - bgW / 2
-            let bgY = circleCenterY + radius + gap
+            let bgY = tipY + gap
 
             let bgRect = CGRect(x: bgX, y: bgY, width: bgW, height: bgH)
             let bgPath = UIBezierPath(roundedRect: bgRect, cornerRadius: bgH / 2)

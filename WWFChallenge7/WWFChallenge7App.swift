@@ -58,6 +58,7 @@ struct WWFChallenge7App: App {
     @StateObject private var syncManager = SyncManager()
     @StateObject private var downloadManager = DownloadManager()
     @StateObject private var userSession = UserSession()
+    @StateObject private var accessibilityPreferences = AccessibilityPreferences()
 
     var body: some Scene {
         WindowGroup {
@@ -66,6 +67,7 @@ struct WWFChallenge7App: App {
                 .environmentObject(syncManager)
                 .environmentObject(downloadManager)
                 .environmentObject(userSession)
+                .environmentObject(accessibilityPreferences)
                 .task {
                     // 1. Configure managers with model context
                     syncManager.configure(with: container.mainContext)

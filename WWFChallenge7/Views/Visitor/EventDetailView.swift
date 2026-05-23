@@ -30,7 +30,7 @@ struct EventDetailView: View {
                             WWFDesign.Colors.forestDark
                             categoryColor.opacity(0.35)
                         }
-                        .frame(height: 260)
+                        .frame(minHeight: 260)
                         
                         // Pattern organico — cerchi sfumati che evocano vegetazione
                         GeometryReader { geo in
@@ -57,6 +57,7 @@ struct EventDetailView: View {
                             .foregroundColor(WWFDesign.Colors.leafGreen.opacity(0.06))
                             .rotationEffect(.degrees(-25))
                             .offset(x: UIScreen.main.bounds.width - 150, y: 30)
+                            .accessibilityHidden(true)
                         
                         // Contenuto testuale allineato in basso
                         VStack(alignment: .leading, spacing: 8) {
@@ -64,8 +65,8 @@ struct EventDetailView: View {
                             
                             // Titolo dell'evento
                             Text(event.localizedName)
-                                .font(Font.custom("Georgia", size: 26).weight(.bold))
-                                .foregroundColor(Color(red: 0.941, green: 0.929, blue: 0.902)) // #f0ede6
+                                .font(Font.custom("Georgia", size: 26, relativeTo: .title).weight(.bold))
+                                .foregroundColor(Color(red: 0.941, green: 0.929, blue: 0.902))
                                 .shadow(color: .black.opacity(0.2), radius: 4, x: 0, y: 2)
 
                             // Data e ora dell'evento
@@ -80,7 +81,7 @@ struct EventDetailView: View {
                         }
                         .padding(20)
                         .padding(.bottom, 24)
-                        .frame(height: 260, alignment: .leading)
+                        .frame(minHeight: 260, alignment: .leading)
                         
                         // Top Row: Pulsante indietro e Categoria dell'evento sulla stessa riga
                         HStack(alignment: .center) {
@@ -98,19 +99,21 @@ struct EventDetailView: View {
                                         .clipShape(Circle())
                                     
                                     Image(systemName: "chevron.left")
-                                        .font(.system(size: 16, weight: .semibold))
+                                        .font(.headline)
                                         .foregroundColor(WWFDesign.Colors.leafLight)
                                         .offset(x: -1)
                                 }
-                                .frame(width: 40, height: 40)
+                                .frame(width: 44, height: 44)
+                                .contentShape(Circle())
                             }
+                            .accessibilityLabel("Torna indietro")
                             
                             Spacer()
                             
                             // Badge Categoria allineato a destra
                             HStack(spacing: 5) {
                                 Image(systemName: event.category.icon)
-                                    .font(.system(size: 10, weight: .bold))
+                                    .font(.caption2.weight(.bold))
                                 Text(localizer.localizedString(for: "event_cat_" + event.category.rawValue))
                                     .font(WWFDesign.Typography.badge)
                                     .fontWeight(.bold)
@@ -124,7 +127,7 @@ struct EventDetailView: View {
                         .padding(.top, 54)
                         .padding(.horizontal, 20)
                     }
-                    .frame(height: 260)
+                    .frame(minHeight: 260)
                     .clipShape(
                         .rect(
                             topLeadingRadius: 0,
@@ -333,6 +336,7 @@ struct EventDetailView: View {
 struct TrailEventCard: View {
     let trail: Trail
     @ObservedObject private var localizer = LocalizationManager.shared
+    @EnvironmentObject var accessibilityPrefs: AccessibilityPreferences
 
     var difficulty: TrailDifficulty {
         trail.difficulty ?? .easy
@@ -386,7 +390,7 @@ struct TrailEventCard: View {
                     .foregroundColor(.secondary)
             }
 
-            Text(trail.localizedDescription)
+            Text(trail.adaptiveDescription(kidsMode: accessibilityPrefs.kidsMode, easyReadMode: accessibilityPrefs.easyReadMode))
                 .font(WWFDesign.Typography.trailDesc)
                 .foregroundColor(.secondary)
                 .lineLimit(2)

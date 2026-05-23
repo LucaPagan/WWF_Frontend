@@ -22,6 +22,9 @@ final class Trail: @unchecked Sendable {
 
     var steps: [TrailStep]
     var startPOIId: UUID?
+    var targetAge: String?
+    var descriptionKids: String?
+    var descriptionEasyRead: String?
 
     var createdAt: Date
     var updatedAt: Date
@@ -41,6 +44,16 @@ final class Trail: @unchecked Sendable {
     }
 
 
+    func adaptiveDescription(kidsMode: Bool, easyReadMode: Bool) -> String {
+        if easyReadMode, let er = descriptionEasyRead, !er.isEmpty {
+            return er
+        }
+        if kidsMode, let kids = descriptionKids, !kids.isEmpty {
+            return kids
+        }
+        return localizedDescription
+    }
+
     init(
         name: String,
         description: String,
@@ -49,6 +62,9 @@ final class Trail: @unchecked Sendable {
         estimatedMinutes: Int? = 60,
         coverImageURL: String? = nil,
         startPOIId: UUID? = nil,
+        targetAge: String? = nil,
+        descriptionKids: String? = nil,
+        descriptionEasyRead: String? = nil,
         fixedID: UUID? = nil
     ) {
         self.id = fixedID ?? UUID()
@@ -60,6 +76,9 @@ final class Trail: @unchecked Sendable {
         self.coverImageURL = coverImageURL
         self.steps = []
         self.startPOIId = startPOIId
+        self.targetAge = targetAge
+        self.descriptionKids = descriptionKids
+        self.descriptionEasyRead = descriptionEasyRead
         self.createdAt = Date()
         self.updatedAt = Date()
         self.needsSync = true
@@ -86,6 +105,9 @@ final class Trail: @unchecked Sendable {
         if let spid = data["start_poi_id"] as? String {
             startPOIId = UUID(uuidString: spid)
         }
+        targetAge = data["target_age"] as? String
+        descriptionKids = data["description_kids"] as? String
+        descriptionEasyRead = data["description_easy_read"] as? String
         needsSync = false
     }
 
