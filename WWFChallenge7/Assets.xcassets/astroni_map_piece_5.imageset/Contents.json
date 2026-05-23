@@ -1,11 +1,12 @@
 {
   "images" : [
     {
+      "filename" : "astroni_map_piece_5.png",
       "idiom" : "universal",
       "scale" : "1x"
     },
     {
-      "filename" : "astroni_map_piece_5.png",
+      "filename" : "astroni_map_piece_5 1.png",
       "idiom" : "universal",
       "scale" : "2x"
     },
