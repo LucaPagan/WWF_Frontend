@@ -13,6 +13,11 @@ import SwiftData
 @MainActor
 class DataService {
     static func seedIfNeeded(context: ModelContext) {
+        // The visitor app must mirror the admin/Supabase catalogue.
+        // Demo seeding creates local trails with different UUIDs and causes duplicates
+        // once the real online catalogue is pulled.
+        return
+
         // Check if data already exists
         let descriptor = FetchDescriptor<Trail>()
         let existing = (try? context.fetch(descriptor)) ?? []

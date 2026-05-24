@@ -7,6 +7,7 @@
 //
 
 import SwiftUI
+import SwiftData
 
 // MARK: - Stato navigazione
 
@@ -29,6 +30,9 @@ enum MapDisplayMode: Equatable {
 struct ActiveTrailView: View {
     let trail: Trail
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var modelContext
+    @EnvironmentObject private var syncManager: SyncManager
+    @EnvironmentObject private var userSession: UserSession
     @ObservedObject private var localizer = LocalizationManager.shared
     @EnvironmentObject var accessibilityPreferences: AccessibilityPreferences
 
@@ -44,6 +48,8 @@ struct ActiveTrailView: View {
     @State private var showQRErrorAlert = false
     @State private var qrErrorMessage  = ""
     @State private var showManualCode  = false
+    @State private var progressRecord: LocalTrailProgress?
+    @State private var globalAlerts: [POI] = []
 
     // MARK: Computed helpers
 
@@ -181,15 +187,23 @@ struct ActiveTrailView: View {
                 }
             }
             .sheet(isPresented: $showManualCode) {
-                NumericCodeEntryView { poi in
+                NumericCodeEntryView(
+                    allowedPOIIds: Set(trail.sortedSteps.compactMap { $0.poi?.id }),
+                    allowGlobalAlerts: true
+                ) { poi in
                     showManualCode = false
                     showScanner = false
-                    if !completedPOIIds.contains(poi.id) {
-                        completedPOIIds.insert(poi.id)
-                        scannedPOI = poi
-                        navigationState = .poiReached(poi)
-                    } else {
+                    let resolver = OfflineQRResolver(trail: trail, globalAlerts: globalAlerts, completedPOIIds: completedPOIIds)
+                    switch resolver.resolve(numericCode: poi.numericCode) {
+                    case .trailPOI(let matched):
+                        markVisited(matched, source: .numericCode, qrPayload: matched.qrPayload)
+                    case .globalAlert(let alert):
+                        scannedPOI = alert
+                    case .alreadyVisited:
                         qrErrorMessage = localizer.localizedString(for: "poi_already_visited")
+                        showQRErrorAlert = true
+                    case .notInDownloadedTrail, .unknown:
+                        qrErrorMessage = localizer.localizedString(for: "qr_not_related")
                         showQRErrorAlert = true
                     }
                 }
@@ -213,7 +227,8 @@ struct ActiveTrailView: View {
             Text(qrErrorMessage)
         }
         .onAppear {
-            navigationState = .atStart
+            loadGlobalAlerts()
+            loadProgress()
         }
     }
 
@@ -382,35 +397,17 @@ struct ActiveTrailView: View {
             return
         }
 
-        let allPOIs = trail.sortedSteps.compactMap { $0.poi }
-
-        guard let matched = allPOIs.first(where: { $0.qrPayload == clean }) else {
-            let expected = allPOIs.map { $0.qrPayload }.joined(separator: "\n• ")
-            let notRelated = localizer.localizedString(for: "qr_not_related")
-            let scanned = localizer.localizedString(for: "scanned")
-            let expectedOneOf = localizer.localizedString(for: "expected_one_of")
-            let fallbackEmpty = localizer.localizedString(for: "no_pois_in_trail")
-            
-            qrErrorMessage = """
-            \(notRelated)
-
-            📷 \(scanned):
-            \(clean)
-
-            ✅ \(expectedOneOf):
-            • \(expected.isEmpty ? fallbackEmpty : expected)
-            """
-            return
-        }
-
-        if completedPOIIds.contains(matched.id) {
+        let resolver = OfflineQRResolver(trail: trail, globalAlerts: globalAlerts, completedPOIIds: completedPOIIds)
+        switch resolver.resolve(payload: clean) {
+        case .trailPOI(let matched):
+            markVisited(matched, source: .qr, qrPayload: clean)
+        case .globalAlert(let alert):
+            scannedPOI = alert
+        case .alreadyVisited:
             qrErrorMessage = localizer.localizedString(for: "poi_already_visited")
-            return
+        case .notInDownloadedTrail, .unknown:
+            qrErrorMessage = "\(localizer.localizedString(for: "qr_not_related"))\n\n\(localizer.localizedString(for: "scanned")):\n\(clean)"
         }
-
-        completedPOIIds.insert(matched.id)
-        scannedPOI = matched
-        navigationState = .poiReached(matched)
     }
 
     // MARK: Modal dismiss
@@ -418,9 +415,87 @@ struct ActiveTrailView: View {
     private func handleModalDismiss() {
         if isCompleted {
             navigationState = .completed
+            completeProgressIfNeeded()
         } else if let next = currentStep {
             navigationState = .navigatingTo(next)
         }
+    }
+
+    private func loadGlobalAlerts() {
+        let descriptor = FetchDescriptor<POI>(
+            predicate: #Predicate { $0.isActive == true }
+        )
+        let pois = (try? modelContext.fetch(descriptor)) ?? []
+        globalAlerts = pois.filter { $0.type.isGlobalAlertType }
+    }
+
+    private func loadProgress() {
+        let pathId = trail.id
+        let descriptor = FetchDescriptor<LocalTrailProgress>(
+            predicate: #Predicate { $0.pathId == pathId }
+        )
+        if let existing = try? modelContext.fetch(descriptor).first {
+            progressRecord = existing
+            completedPOIIds = Set(existing.visits.map { $0.poiId })
+            if existing.status == .completed {
+                navigationState = .completed
+            } else if let next = currentStep, !completedPOIIds.isEmpty {
+                navigationState = .navigatingTo(next)
+            } else {
+                navigationState = .atStart
+            }
+        } else {
+            let progress = LocalTrailProgress(pathId: trail.id)
+            modelContext.insert(progress)
+            try? modelContext.save()
+            progressRecord = progress
+            navigationState = .atStart
+        }
+    }
+
+    private func markVisited(_ poi: POI, source: LocalVisitSource, qrPayload: String?) {
+        guard !completedPOIIds.contains(poi.id) else {
+            qrErrorMessage = localizer.localizedString(for: "poi_already_visited")
+            showQRErrorAlert = true
+            return
+        }
+
+        if progressRecord == nil {
+            loadProgress()
+        }
+
+        completedPOIIds.insert(poi.id)
+        scannedPOI = poi
+        navigationState = .poiReached(poi)
+
+        if let progressRecord {
+            if !progressRecord.visits.contains(where: { $0.poiId == poi.id }) {
+                let visit = LocalPOIVisit(
+                    progressId: progressRecord.id,
+                    poiId: poi.id,
+                    source: source,
+                    qrPayload: qrPayload
+                )
+                progressRecord.visits.append(visit)
+                modelContext.insert(visit)
+            }
+            progressRecord.status = isCompleted ? .completed : .inProgress
+            progressRecord.completedAt = isCompleted ? Date() : progressRecord.completedAt
+            progressRecord.updatedAt = Date()
+            progressRecord.needsSync = true
+            try? modelContext.save()
+            Task { await syncManager.pushPendingProgress(deviceId: userSession.deviceId) }
+        }
+    }
+
+    private func completeProgressIfNeeded() {
+        guard let progressRecord, progressRecord.status != .completed else { return }
+        progressRecord.status = .completed
+        progressRecord.completedAt = Date()
+        progressRecord.updatedAt = Date()
+        progressRecord.needsSync = true
+        try? modelContext.save()
+        Task { await syncManager.pushPendingProgress(deviceId: userSession.deviceId) }
     }
 }
 

@@ -16,6 +16,8 @@ struct NumericCodeEntryView: View {
     @State private var code = ""
     @State private var errorMessage: String?
     @State private var isLoading = false
+    var allowedPOIIds: Set<UUID>? = nil
+    var allowGlobalAlerts: Bool = true
     var onPOIFound: (POI) -> Void
 
     var body: some View {
@@ -117,7 +119,7 @@ struct NumericCodeEntryView: View {
 
         do {
             let results = try modelContext.fetch(descriptor)
-            if let poi = results.first {
+            if let poi = results.first, isAllowed(poi) {
                 // Haptic success
                 UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
                 // VoiceOver announcement
@@ -126,7 +128,7 @@ struct NumericCodeEntryView: View {
                 onPOIFound(poi)
                 dismiss()
             } else {
-                errorMessage = "Nessun punto di interesse trovato con questo codice"
+                errorMessage = "Codice non valido per questo percorso"
                 UINotificationFeedbackGenerator().notificationOccurred(.error)
             }
         } catch {
@@ -134,5 +136,15 @@ struct NumericCodeEntryView: View {
         }
 
         isLoading = false
+    }
+
+    private func isAllowed(_ poi: POI) -> Bool {
+        if let allowedPOIIds, allowedPOIIds.contains(poi.id) {
+            return true
+        }
+        if allowGlobalAlerts, poi.type.isGlobalAlertType {
+            return true
+        }
+        return allowedPOIIds == nil
     }
 }

@@ -19,6 +19,13 @@ final class DownloadPackage {
     var includes3D: Bool
     var bundleURL: String?
     var isReady: Bool
+    var manifestVersion: String
+    var manifestSHA256: String?
+    var assetCount: Int
+    var generationStatus: String
+    var generatedAt: Date?
+    var errorMessage: String?
+    var requiredAppVersion: String?
     var createdAt: Date
     var updatedAt: Date
 
@@ -32,7 +39,7 @@ final class DownloadPackage {
 
     var isDownloaded: Bool {
         guard let path = localPath else { return false }
-        if path == "offline_ready" { return true }
+        if path == "offline_ready" { return false }
         return FileManager.default.fileExists(atPath: path)
     }
 
@@ -58,6 +65,13 @@ final class DownloadPackage {
         self.includes3D = includes3D
         self.bundleURL = bundleURL
         self.isReady = isReady
+        self.manifestVersion = "1"
+        self.manifestSHA256 = nil
+        self.assetCount = 0
+        self.generationStatus = isReady ? "ready" : "pending"
+        self.generatedAt = nil
+        self.errorMessage = nil
+        self.requiredAppVersion = nil
         self.localPath = nil
         self.createdAt = Date()
         self.updatedAt = Date()
@@ -71,5 +85,14 @@ final class DownloadPackage {
         if let m = data["includes_3d"] as? Bool { includes3D = m }
         bundleURL = data["bundle_url"] as? String
         if let r = data["is_ready"] as? Bool { isReady = r }
+        if let version = data["manifest_version"] as? String { manifestVersion = version }
+        manifestSHA256 = data["manifest_sha256"] as? String
+        if let count = data["asset_count"] as? Int { assetCount = count }
+        if let status = data["generation_status"] as? String { generationStatus = status }
+        if let required = data["required_app_version"] as? String { requiredAppVersion = required }
+        errorMessage = data["error_message"] as? String
+        if localPath == "offline_ready" {
+            localPath = nil
+        }
     }
 }

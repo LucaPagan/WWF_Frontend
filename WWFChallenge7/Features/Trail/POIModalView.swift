@@ -30,7 +30,7 @@ struct POIModalView: View {
     var onContinue: (() -> Void)? = nil
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var accessibilityPrefs: AccessibilityPreferences
-    @StateObject private var voiceService = VoiceService.shared
+    @StateObject private var viewModel: POIViewModel
     @ObservedObject private var localizer = LocalizationManager.shared
 
     @Query private var contents: [Content]
@@ -41,6 +41,7 @@ struct POIModalView: View {
 
     init(poi: POI, onContinue: (() -> Void)? = nil) {
         self.poi = poi
+        self._viewModel = StateObject(wrappedValue: POIViewModel(poi: poi))
         self.onContinue = onContinue
         let poiId = poi.id
         let filter = #Predicate<Content> { $0.poiId == poiId }
@@ -175,7 +176,7 @@ struct POIModalView: View {
                                 .clipShape(RoundedRectangle(cornerRadius: WWFDesign.Radius.card))
                                 .padding(.horizontal)
                         } else if let urlStr = poi.photoURL {
-                            SupabaseImageView(urlStr: urlStr)
+                            RemoteImageView(urlStr: urlStr)
                                 .padding(.horizontal)
                         }
                     }
@@ -189,13 +190,12 @@ struct POIModalView: View {
                                 .foregroundColor(WWFDesign.Colors.forestDark)
                             Spacer()
                             Button {
-                                if voiceService.isSpeaking {
-                                    voiceService.stop()
-                                } else {
-                                    voiceService.speak(poi.adaptiveDescription(kidsMode: accessibilityPrefs.kidsMode, easyReadMode: accessibilityPrefs.easyReadMode), languageCode: localizer.preferredLanguage)
-                                }
+                                viewModel.toggleAudio(
+                                    text: poi.adaptiveDescription(kidsMode: accessibilityPrefs.kidsMode, easyReadMode: accessibilityPrefs.easyReadMode),
+                                    languageCode: localizer.preferredLanguage
+                                )
                             } label: {
-                                Image(systemName: voiceService.isSpeaking ? "stop.circle.fill" : "speaker.wave.2.circle.fill")
+                                Image(systemName: viewModel.isSpeaking ? "stop.circle.fill" : "speaker.wave.2.circle.fill")
                                     .font(.title2)
                                     .foregroundColor(accentColor)
                             }
@@ -261,11 +261,13 @@ struct POIModalView: View {
             }
             .fullScreenCover(isPresented: $showFullScreenGallery) {
                 FullScreenGalleryView(items: galleryItems, selectedItemId: $selectedGalleryItemId)
+                    .environmentObject(viewModel)
             }
             .onDisappear {
                 // Removed voiceService.stop() to allow audio to play in background
             }
         }
+        .environmentObject(viewModel)
     }
 }
 
@@ -317,7 +319,7 @@ struct ContentThumbnailView: View {
                             .frame(width: 140, height: 100)
                             .clipShape(RoundedRectangle(cornerRadius: WWFDesign.Radius.card))
                     } else if let urlStr = content.fileURL {
-                        SupabaseImageView(urlStr: urlStr)
+                        RemoteImageView(urlStr: urlStr)
                             .frame(width: 140, height: 100)
                             .clipShape(RoundedRectangle(cornerRadius: WWFDesign.Radius.card))
                     } else {
@@ -451,7 +453,7 @@ struct ZoomableImageView: View {
                         .resizable()
                         .scaledToFit()
                 } else if let urlStr = remoteURLStr {
-                    SupabaseImageView(urlStr: urlStr)
+                    RemoteImageView(urlStr: urlStr)
                 } else {
                     Image(systemName: "photo")
                         .font(.largeTitle)
@@ -775,9 +777,10 @@ struct Model3DView: View {
     }
 }
 
-// Custom Image Viewer bypassing default URLSession QUIC issues
-struct SupabaseImageView: View {
+// Custom Image Viewer bypassing direct singleton usage
+struct RemoteImageView: View {
     let urlStr: String
+    @EnvironmentObject var viewModel: POIViewModel
     @State private var uiImage: UIImage? = nil
     @State private var isLoading = false
 
@@ -814,12 +817,12 @@ struct SupabaseImageView: View {
         isLoading = true
         defer { isLoading = false }
         do {
-            let data = try await SupabaseConfig.shared.downloadFile(from: urlStr)
+            let data = try await viewModel.downloadData(from: urlStr)
             if let img = UIImage(data: data) {
                 uiImage = img
             }
         } catch {
-            print("SupabaseImageView failed to load: \(error)")
+            print("RemoteImageView failed to load: \(error)")
         }
     }
 }

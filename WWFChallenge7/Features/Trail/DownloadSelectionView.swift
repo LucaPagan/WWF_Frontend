@@ -14,6 +14,7 @@ struct DownloadSelectionView: View {
     var onDownloadComplete: (() -> Void)? = nil
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var downloadManager: DownloadManager
+    @EnvironmentObject var syncManager: SyncManager
     @Environment(\.modelContext) private var modelContext
     @ObservedObject private var localizer = LocalizationManager.shared
     
@@ -124,6 +125,19 @@ struct DownloadSelectionView: View {
                         }
                     } else {
                         let isCurrentTierDownloaded = downloadedTiers.contains(selectedTier)
+                        let packageAvailable = package(for: selectedTier) != nil
+
+                        if let error = downloadManager.error {
+                            Text(error)
+                                .font(WWFDesign.Typography.trailDesc)
+                                .foregroundColor(.red)
+                                .multilineTextAlignment(.center)
+                        } else if !packageAvailable && !isCurrentTierDownloaded {
+                            Text("Bundle offline non ancora disponibile. Riprova dopo la sincronizzazione.")
+                                .font(WWFDesign.Typography.trailDesc)
+                                .foregroundColor(.secondary)
+                                .multilineTextAlignment(.center)
+                        }
                         
                         Button {
                             if isCurrentTierDownloaded {
@@ -150,8 +164,9 @@ struct DownloadSelectionView: View {
                             .clipShape(RoundedRectangle(cornerRadius: WWFDesign.Radius.card))
                             .shadow(color: WWFDesign.Colors.forestMid.opacity(0.2), radius: 8, x: 0, y: 4)
                         }
+                        .opacity(!isCurrentTierDownloaded && !packageAvailable ? 0.75 : 1)
                         .accessibilityLabel(isCurrentTierDownloaded ? "Usa questa versione e inizia" : "Scarica e inizia")
-                        .accessibilityHint("Avvia il percorso con il livello di download selezionato")
+                        .accessibilityHint(packageAvailable || isCurrentTierDownloaded ? "Avvia il percorso con il livello di download selezionato" : "Verifica se il bundle offline e disponibile")
                     }
                     
                     Button(localizer.localizedString(for: "cancel")) {
@@ -193,19 +208,17 @@ struct DownloadSelectionView: View {
         
         
         private func startDownload() async {
-            let tierRaw = selectedTier.rawValue
-            let trailId = trail.id
-            
-            let descriptor = FetchDescriptor<DownloadPackage>(
-                predicate: #Predicate<DownloadPackage> { $0.pathId == trailId && $0.tierRawValue == tierRaw }
-            )
-            
-            let pkg: DownloadPackage
-            if let existing = try? modelContext.fetch(descriptor).first {
-                pkg = existing
-            } else {
-                pkg = DownloadPackage(pathId: trailId, tier: selectedTier, isReady: true)
-                modelContext.insert(pkg)
+            downloadManager.error = nil
+
+            var pkg = package(for: selectedTier)
+            if pkg == nil {
+                await syncManager.pullLatestData()
+                pkg = package(for: selectedTier)
+            }
+
+            guard let pkg else {
+                downloadManager.error = "Bundle offline non disponibile per questo livello."
+                return
             }
             
             await downloadManager.downloadPackage(pkg, language: selectedLanguage)
@@ -216,6 +229,20 @@ struct DownloadSelectionView: View {
                     dismiss()
                 }
             }
+        }
+
+        private func package(for tier: ContentTier) -> DownloadPackage? {
+            let tierRaw = tier.rawValue
+            let trailId = trail.id
+            let descriptor = FetchDescriptor<DownloadPackage>(
+                predicate: #Predicate<DownloadPackage> {
+                    $0.pathId == trailId &&
+                    $0.tierRawValue == tierRaw &&
+                    $0.isReady == true &&
+                    $0.generationStatus == "ready"
+                }
+            )
+            return try? modelContext.fetch(descriptor).first
         }
     }
 

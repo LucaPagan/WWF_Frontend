@@ -70,12 +70,24 @@ struct DashboardView: View {
     @State private var showInfoSheet: Bool = false
     @ObservedObject private var localizer = LocalizationManager.shared
     @EnvironmentObject var accessibilityPreferences: AccessibilityPreferences
+    @EnvironmentObject var syncManager: SyncManager
+
+    private var displayedTrails: [Trail] {
+        var byName: [String: Trail] = [:]
+        for trail in trails.sorted(by: trailSort) {
+            let key = trail.name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            if byName[key] == nil {
+                byName[key] = trail
+            }
+        }
+        return byName.values.sorted(by: trailSort)
+    }
 
     private var currentTrail: Trail {
-        if let id = visibleTrailId, let trail = trails.first(where: { $0.id == id }) {
+        if let id = visibleTrailId, let trail = displayedTrails.first(where: { $0.id == id }) {
             return trail
         }
-        return trails.first ?? Trail(name: "", description: "")
+        return displayedTrails.first ?? Trail(name: "", description: "")
     }
 
     var body: some View {
@@ -190,10 +202,10 @@ struct DashboardView: View {
                 }
                 
                 // Bottom Overlay: Trail Cards
-                if !trails.isEmpty {
+                if !displayedTrails.isEmpty {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 16) {
-                            ForEach(trails) { trail in
+                            ForEach(displayedTrails) { trail in
                                 AstroniTrailCard(trail: trail)
                                     .containerRelativeFrame(.horizontal, count: 1, spacing: 16)
                                     .onTapGesture {
@@ -210,7 +222,7 @@ struct DashboardView: View {
                     .padding(.bottom, 120)
                     .onAppear {
                         if visibleTrailId == nil {
-                            visibleTrailId = trails.first?.id
+                            visibleTrailId = displayedTrails.first?.id
                         }
                     }
                 }
@@ -231,7 +243,20 @@ struct DashboardView: View {
             .fullScreenCover(item: $trailToStart) { trail in
                 ActiveTrailView(trail: trail)
             }
+            .task {
+                await syncManager.pullLatestData()
+            }
         }
+    }
+
+    private func trailSort(_ lhs: Trail, _ rhs: Trail) -> Bool {
+        if lhs.needsSync != rhs.needsSync {
+            return rhs.needsSync
+        }
+        if lhs.updatedAt != rhs.updatedAt {
+            return lhs.updatedAt > rhs.updatedAt
+        }
+        return lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
     }
 }
 

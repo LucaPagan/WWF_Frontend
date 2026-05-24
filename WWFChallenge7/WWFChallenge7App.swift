@@ -25,7 +25,11 @@ struct WWFChallenge7App: App {
                 Content.self,
                 DownloadPackage.self,
                 UserProfile.self,
-                LocalTranslation.self
+                LocalTranslation.self,
+                LocalTrailProgress.self,
+                LocalPOIVisit.self,
+                SyncOutboxItem.self,
+                LocalBundleInstall.self
             ])
             let config = ModelConfiguration(
                 schema: schema,
@@ -45,7 +49,11 @@ struct WWFChallenge7App: App {
                     Content.self,
                     DownloadPackage.self,
                     UserProfile.self,
-                    LocalTranslation.self
+                    LocalTranslation.self,
+                    LocalTrailProgress.self,
+                    LocalPOIVisit.self,
+                    SyncOutboxItem.self,
+                    LocalBundleInstall.self
                 ])
                 let config = ModelConfiguration(schema: schema)
                 container = try ModelContainer(for: schema, configurations: config)

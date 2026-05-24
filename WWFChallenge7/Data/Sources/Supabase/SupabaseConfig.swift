@@ -23,11 +23,11 @@ final class SupabaseConfig: NetworkClient, @unchecked Sendable {
     
     private var session: URLSession = {
         let config = URLSessionConfiguration.default
-        config.timeoutIntervalForRequest = 60
-        config.timeoutIntervalForResource = 300
+        config.timeoutIntervalForRequest = 12
+        config.timeoutIntervalForResource = 45
         config.httpMaximumConnectionsPerHost = 1
         config.httpShouldUsePipelining = false
-        config.waitsForConnectivity = true
+        config.waitsForConnectivity = false
         return URLSession(configuration: config)
     }()
 
@@ -344,6 +344,34 @@ final class SupabaseConfig: NetworkClient, @unchecked Sendable {
         return (try? JSONSerialization.jsonObject(with: data) as? [[String: Any]]) ?? []
     }
 
+    // MARK: - Edge Functions
+
+    func invokeFunction(_ functionName: String, queryItems: [URLQueryItem] = []) async throws -> [String: Any] {
+        var components = URLComponents(string: "\(projectURL)/functions/v1/\(functionName)")!
+        components.queryItems = queryItems.isEmpty ? nil : queryItems
+        guard let url = components.url else {
+            throw SupabaseError.networkError("Invalid function URL")
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        if let token = accessToken {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        } else {
+            request.setValue("Bearer \(anonKey)", forHTTPHeaderField: "Authorization")
+        }
+
+        let (data, httpResponse) = try await performRequestWithRetry(request)
+        guard (200...299).contains(httpResponse.statusCode) else {
+            let body = String(data: data, encoding: .utf8) ?? ""
+            throw SupabaseError.apiError("Function \(functionName) failed (\(httpResponse.statusCode)): \(body)")
+        }
+
+        return (try? JSONSerialization.jsonObject(with: data) as? [String: Any]) ?? [:]
+    }
+
     // MARK: - Storage Download (User module addition)
 
     func downloadFile(from url: String) async throws -> Data {
@@ -366,6 +394,22 @@ final class SupabaseConfig: NetworkClient, @unchecked Sendable {
         
         guard (200...299).contains(httpResponse.statusCode) else {
             throw SupabaseError.storageError("Download failed with status \(httpResponse.statusCode) for URL: \(sanitizedURL)")
+        }
+
+        return data
+    }
+
+    func downloadSignedURL(_ url: String) async throws -> Data {
+        guard let fileURL = URL(string: url) else {
+            throw SupabaseError.networkError("Invalid signed URL")
+        }
+
+        var request = URLRequest(url: fileURL)
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        let (data, httpResponse) = try await performRequestWithRetry(request, useStorageSession: true)
+
+        guard (200...299).contains(httpResponse.statusCode) else {
+            throw SupabaseError.storageError("Download failed with status \(httpResponse.statusCode)")
         }
 
         return data

@@ -33,7 +33,7 @@ final class QRScannerViewController: UIViewController, AVCaptureMetadataOutputOb
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .black
-        setupSession()
+        requestCameraIfNeeded()
         addOverlay()
     }
 
@@ -45,6 +45,21 @@ final class QRScannerViewController: UIViewController, AVCaptureMetadataOutputOb
             DispatchQueue.global(qos: .userInitiated).async { [weak self] in
                 self?.captureSession?.startRunning()
             }
+        }
+    }
+
+    private func requestCameraIfNeeded() {
+        switch AVCaptureDevice.authorizationStatus(for: .video) {
+        case .authorized:
+            setupSession()
+        case .notDetermined:
+            AVCaptureDevice.requestAccess(for: .video) { [weak self] granted in
+                DispatchQueue.main.async {
+                    granted ? self?.setupSession() : self?.showCameraUnavailableMessage()
+                }
+            }
+        default:
+            showCameraUnavailableMessage()
         }
     }
 
@@ -75,6 +90,23 @@ final class QRScannerViewController: UIViewController, AVCaptureMetadataOutputOb
         DispatchQueue.global(qos: .userInitiated).async {
             session.startRunning()
         }
+    }
+
+    private func showCameraUnavailableMessage() {
+        let label = UILabel()
+        label.text = "Fotocamera non disponibile. Usa il codice manuale."
+        label.textColor = .white
+        label.font = UIFont.preferredFont(forTextStyle: .headline)
+        label.numberOfLines = 0
+        label.textAlignment = .center
+        label.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(label)
+        NSLayoutConstraint.activate([
+            label.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            label.centerYAnchor.constraint(equalTo: view.centerYAnchor),
+            label.leadingAnchor.constraint(greaterThanOrEqualTo: view.leadingAnchor, constant: 24),
+            label.trailingAnchor.constraint(lessThanOrEqualTo: view.trailingAnchor, constant: -24)
+        ])
     }
 
     private func addOverlay() {

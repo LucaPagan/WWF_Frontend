@@ -27,6 +27,8 @@ final class Content {
     var hasEasyRead: Bool
     var descriptionKids: String?
     var subtitleURL: String?
+    var localFilePath: String?
+    var installedPackageId: UUID?
 
     @Transient var contentType: ContentType {
         get { ContentType(rawValue: typeRawValue) ?? .text }
@@ -68,6 +70,8 @@ final class Content {
         self.hasEasyRead = hasEasyRead
         self.descriptionKids = descriptionKids
         self.subtitleURL = subtitleURL
+        self.localFilePath = nil
+        self.installedPackageId = nil
         self.createdAt = Date()
         self.updatedAt = Date()
     }
@@ -175,6 +179,9 @@ extension Content {
     }
     
     var localFileURL: URL? {
+        if let localFilePath, FileManager.default.fileExists(atPath: localFilePath) {
+            return URL(fileURLWithPath: localFilePath)
+        }
         let documentsDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
         let baseDir = documentsDir.appendingPathComponent("OfflineContent", isDirectory: true)
         let fileURL = baseDir.appendingPathComponent(localFileName)

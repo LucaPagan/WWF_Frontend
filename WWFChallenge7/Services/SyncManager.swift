@@ -60,6 +60,21 @@ final class SyncManager: ObservableObject {
             syncState = .error(message: error.localizedDescription)
         }
     }
+
+    func pushPendingProgress(deviceId: String) async {
+        guard let container = modelContainer else { return }
+        guard await SupabaseConfig.shared.currentSession() != nil else { return }
+
+        do {
+            let worker = UserSyncWorker(
+                modelContainer: container,
+                networkClient: networkClient
+            )
+            try await worker.pushPendingProgress(deviceId: deviceId)
+        } catch {
+            syncState = .error(message: error.localizedDescription)
+        }
+    }
 }
 
 // MARK: - UserSyncWorker (Background ModelActor)
@@ -147,7 +162,6 @@ actor UserSyncWorker: ModelActor {
             count += 1
         }
 
-        try pruneStaleRecords(of: LocalTranslation.self, remoteIds: remoteIds)
         return count
     }
 
@@ -172,9 +186,6 @@ actor UserSyncWorker: ModelActor {
             count += 1
         }
 
-        // Prune local POIs that no longer exist on server
-        try pruneStaleRecords(of: POI.self, remoteIds: remoteIds)
-
         return count
     }
 
@@ -198,10 +209,18 @@ actor UserSyncWorker: ModelActor {
             count += 1
         }
 
-        // Prune local Trails that no longer exist on server
-        try pruneStaleRecords(of: Trail.self, remoteIds: remoteIds)
-
+        try reconcileLocalTrails(withRemoteIds: remoteIds)
         return count
+    }
+
+    private func reconcileLocalTrails(withRemoteIds remoteIds: Set<UUID>) throws {
+        guard !remoteIds.isEmpty else { return }
+
+        let localTrails = try modelContext.fetch(FetchDescriptor<Trail>())
+        for trail in localTrails where !remoteIds.contains(trail.id) {
+            trail.isActive = false
+            trail.needsSync = false
+        }
     }
 
     // MARK: - Pull PathSteps
@@ -255,9 +274,6 @@ actor UserSyncWorker: ModelActor {
             count += 1
         }
 
-        // Prune orphaned steps
-        try pruneStaleRecords(of: TrailStep.self, remoteIds: remoteIds)
-
         return count
     }
 
@@ -308,7 +324,6 @@ actor UserSyncWorker: ModelActor {
             count += 1
         }
 
-        try pruneStaleRecords(of: Content.self, remoteIds: remoteIds)
         return count
     }
 
@@ -370,11 +385,40 @@ actor UserSyncWorker: ModelActor {
                     isReady: data["is_ready"] as? Bool ?? false,
                     fixedID: remoteId
                 )
+                pkg.updateFromRemote(data)
                 modelContext.insert(pkg)
             }
             count += 1
         }
         return count
+    }
+
+    func pushPendingProgress(deviceId: String) async throws {
+        let descriptor = FetchDescriptor<LocalTrailProgress>(
+            predicate: #Predicate { $0.needsSync == true }
+        )
+        let progresses = try modelContext.fetch(descriptor)
+
+        for progress in progresses {
+            let visits = progress.visits.map { visit in
+                [
+                    "poi_id": visit.poiId.uuidString,
+                    "scanned_at": ISO8601DateFormatter().string(from: visit.scannedAt)
+                ]
+            }
+            _ = try await networkClient.rpc("sync_user_progress", params: [
+                "p_path_id": progress.pathId.uuidString,
+                "p_status": progress.statusRawValue,
+                "p_started_at": ISO8601DateFormatter().string(from: progress.startedAt),
+                "p_completed_at": progress.completedAt.map { ISO8601DateFormatter().string(from: $0) },
+                "p_device_id": deviceId,
+                "p_visits": visits
+            ])
+            progress.needsSync = false
+            progress.updatedAt = Date()
+        }
+
+        try modelContext.save()
     }
 
     // MARK: - Stale Record Pruning
