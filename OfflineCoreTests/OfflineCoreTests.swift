@@ -47,6 +47,22 @@ struct ProgressStore: Codable {
     var visitedPOIIds: Set<UUID>
 }
 
+struct TestGamificationLevel {
+    let number: Int
+    let title: String
+    let requiredXP: Int
+}
+
+struct TestRewardLedger {
+    private(set) var xpTotal = 0
+    private(set) var awardedKeys: Set<String> = []
+
+    mutating func awardXP(_ xp: Int, key: String) {
+        guard awardedKeys.insert(key).inserted else { return }
+        xpTotal += xp
+    }
+}
+
 func expect(_ condition: @autoclosure () -> Bool, _ message: String) {
     if !condition() {
         fputs("FAIL: \(message)\n", stderr)
@@ -136,10 +152,46 @@ func testQROfflineMembership() {
     expect(!allowed.values.contains("QR_OTHER"), "other path QR is rejected")
 }
 
+func testGamificationLevelThresholds() {
+    let levels = [
+        TestGamificationLevel(number: 1, title: "Visitatore", requiredXP: 0),
+        TestGamificationLevel(number: 2, title: "Esploratore", requiredXP: 250),
+        TestGamificationLevel(number: 3, title: "Naturalista", requiredXP: 750),
+        TestGamificationLevel(number: 4, title: "Custode dell'Oasi", requiredXP: 1500),
+        TestGamificationLevel(number: 5, title: "Guardiano WWF", requiredXP: 3000)
+    ]
+
+    func currentLevel(for xp: Int) -> TestGamificationLevel {
+        levels
+            .filter { xp >= $0.requiredXP }
+            .sorted { $0.requiredXP < $1.requiredXP }
+            .last ?? levels[0]
+    }
+
+    expect(currentLevel(for: 0).number == 1, "0 XP starts as visitor")
+    expect(currentLevel(for: 249).number == 1, "level threshold is not crossed early")
+    expect(currentLevel(for: 250).title == "Esploratore", "250 XP unlocks explorer")
+    expect(currentLevel(for: 3000).number == 5, "max seeded threshold resolves")
+}
+
+func testGamificationRewardIdempotency() {
+    var ledger = TestRewardLedger()
+    let poiId = UUID().uuidString
+
+    ledger.awardXP(25, key: "poi_scanned:\(poiId)")
+    ledger.awardXP(25, key: "poi_scanned:\(poiId)")
+    ledger.awardXP(100, key: "trail_completed:\(UUID().uuidString)")
+
+    expect(ledger.xpTotal == 125, "duplicate POI reward is ignored")
+    expect(ledger.awardedKeys.count == 2, "unique reward keys are tracked")
+}
+
 try testManifestDecodeAndGlobalAlerts()
 try testAtomicCommitAndRollback()
 try testRecoveryAndChecksum()
 try testProgressPersistence()
 testTierInclusion()
 testQROfflineMembership()
+testGamificationLevelThresholds()
+testGamificationRewardIdempotency()
 print("OfflineCoreTests passed")

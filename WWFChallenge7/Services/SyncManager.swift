@@ -118,7 +118,142 @@ actor UserSyncWorker: ModelActor {
         // 7. Translations
         count += try await pullTranslations()
 
+        // 8. Gamification definitions
+        count += try await pullGamificationLevels()
+        count += try await pullGamificationRules()
+        count += try await pullBadges()
+        count += try await pullSpecies()
+
         try modelContext.save()
+        return count
+    }
+
+    // MARK: - Pull Gamification
+
+    private func pullGamificationLevels() async throws -> Int {
+        let remoteLevels = try await networkClient.fetch(
+            from: "gamification_levels",
+            query: "select=*&order=required_xp.asc"
+        )
+        var count = 0
+
+        for data in remoteLevels {
+            guard let idStr = data["id"] as? String, let remoteId = UUID(uuidString: idStr) else { continue }
+            let descriptor = FetchDescriptor<LocalGamificationLevel>(predicate: #Predicate { $0.id == remoteId })
+            if let existing = try modelContext.fetch(descriptor).first {
+                existing.updateFromRemote(data)
+            } else {
+                let level = LocalGamificationLevel(
+                    id: remoteId,
+                    levelNumber: data["level_number"] as? Int ?? 1,
+                    title: data["title"] as? String ?? "Visitatore",
+                    description: data["description"] as? String,
+                    requiredXP: data["required_xp"] as? Int ?? 0,
+                    iconName: data["icon_name"] as? String,
+                    imageURL: data["image_url"] as? String,
+                    isActive: data["is_active"] as? Bool ?? true,
+                    createdAt: LocalGamificationDateParser.date(from: data["created_at"]) ?? Date(),
+                    updatedAt: LocalGamificationDateParser.date(from: data["updated_at"]) ?? Date()
+                )
+                modelContext.insert(level)
+            }
+            count += 1
+        }
+
+        return count
+    }
+
+    private func pullGamificationRules() async throws -> Int {
+        let remoteRules = try await networkClient.fetch(
+            from: "gamification_rules",
+            query: "select=*&order=priority.desc"
+        )
+        var count = 0
+
+        for data in remoteRules {
+            guard let idStr = data["id"] as? String, let remoteId = UUID(uuidString: idStr) else { continue }
+            let descriptor = FetchDescriptor<LocalGamificationRule>(predicate: #Predicate { $0.id == remoteId })
+            if let existing = try modelContext.fetch(descriptor).first {
+                existing.updateFromRemote(data)
+            } else {
+                let rule = LocalGamificationRule(
+                    id: remoteId,
+                    title: data["title"] as? String ?? "Regola",
+                    description: data["description"] as? String,
+                    triggerType: data["trigger_type"] as? String ?? "",
+                    conditions: data["conditions_json"] as? [String: Any] ?? [:],
+                    reward: data["reward_json"] as? [String: Any] ?? [:],
+                    audience: data["audience"] as? String ?? "all",
+                    isHidden: data["is_hidden"] as? Bool ?? false,
+                    isRepeatable: data["is_repeatable"] as? Bool ?? false,
+                    cooldownSeconds: data["cooldown_seconds"] as? Int,
+                    startsAt: LocalGamificationDateParser.date(from: data["starts_at"]),
+                    endsAt: LocalGamificationDateParser.date(from: data["ends_at"]),
+                    priority: data["priority"] as? Int ?? 0,
+                    isActive: data["is_active"] as? Bool ?? true,
+                    createdAt: LocalGamificationDateParser.date(from: data["created_at"]) ?? Date(),
+                    updatedAt: LocalGamificationDateParser.date(from: data["updated_at"]) ?? Date()
+                )
+                modelContext.insert(rule)
+            }
+            count += 1
+        }
+
+        return count
+    }
+
+    private func pullBadges() async throws -> Int {
+        let remoteBadges = try await networkClient.fetch(
+            from: "badges",
+            query: "select=*&order=sort_order.asc"
+        )
+        var count = 0
+
+        for data in remoteBadges {
+            guard let idStr = data["id"] as? String, let remoteId = UUID(uuidString: idStr) else { continue }
+            let descriptor = FetchDescriptor<LocalBadge>(predicate: #Predicate { $0.id == remoteId })
+            if let existing = try modelContext.fetch(descriptor).first {
+                existing.updateFromRemote(data)
+            } else {
+                let badge = LocalBadge(
+                    id: remoteId,
+                    name: data["name"] as? String ?? "Badge",
+                    description: data["description"] as? String
+                )
+                badge.updateFromRemote(data)
+                modelContext.insert(badge)
+            }
+            count += 1
+        }
+
+        return count
+    }
+
+    private func pullSpecies() async throws -> Int {
+        let remoteSpecies = try await networkClient.fetch(
+            from: "species",
+            query: "select=*&order=name.asc"
+        )
+        var count = 0
+
+        for data in remoteSpecies {
+            guard let idStr = data["id"] as? String, let remoteId = UUID(uuidString: idStr) else { continue }
+            let descriptor = FetchDescriptor<LocalSpecies>(predicate: #Predicate { $0.id == remoteId })
+            if let existing = try modelContext.fetch(descriptor).first {
+                existing.updateFromRemote(data)
+            } else {
+                let species = LocalSpecies(
+                    id: remoteId,
+                    name: data["name"] as? String ?? "Specie",
+                    description: data["description"] as? String ?? "",
+                    category: data["category"] as? String ?? "fauna"
+                )
+                species.updateFromRemote(data)
+                modelContext.insert(species)
+            }
+            count += 1
+        }
+
         return count
     }
 

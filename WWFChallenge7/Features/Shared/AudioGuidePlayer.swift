@@ -27,6 +27,8 @@ class AudioPlayerViewModel: ObservableObject {
     @Published var currentTime: TimeInterval = 0
     @Published var duration: TimeInterval = 0
     @Published var rate: Float = 1.0
+    var onCompletionThresholdReached: (() -> Void)?
+    private var hasReportedCompletion = false
 
     func load(url: URL) {
         // Setup AVAudioSession for background playback
@@ -110,6 +112,10 @@ class AudioPlayerViewModel: ObservableObject {
                 guard let self = self, let player = self.avPlayer else { return }
                 self.currentTime = player.currentTime
                 self.progress = self.duration > 0 ? player.currentTime / self.duration : 0
+                if self.progress >= 0.8 && !self.hasReportedCompletion {
+                    self.hasReportedCompletion = true
+                    self.onCompletionThresholdReached?()
+                }
 
                 if !player.isPlaying && self.isPlaying {
                     self.isPlaying = false
@@ -161,6 +167,7 @@ struct AudioGuidePlayer: View {
     let audioURL: URL
     let title: String
     let durationSeconds: Int?
+    var onCompleted: (() -> Void)? = nil
     @StateObject private var player = AudioPlayerViewModel()
 
     var body: some View {
@@ -247,7 +254,10 @@ struct AudioGuidePlayer: View {
         .padding()
         .background(Color(.systemGray6))
         .cornerRadius(16)
-        .onAppear { player.load(url: audioURL) }
+        .onAppear {
+            player.onCompletionThresholdReached = onCompleted
+            player.load(url: audioURL)
+        }
         .onDisappear { player.stop() }
     }
 

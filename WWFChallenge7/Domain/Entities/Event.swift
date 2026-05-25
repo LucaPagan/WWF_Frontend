@@ -28,6 +28,9 @@ final class Event: @unchecked Sendable {
     var imageURL: String?
     var organizerName: String?
     var photoData: Data?
+    var completionQrPayload: String?
+    var completionNumericCode: String?
+    var gamificationRewardData: Data?
 
     var trail: Trail?
     var eventPOI: POI?
@@ -92,6 +95,9 @@ final class Event: @unchecked Sendable {
         self.price = price
         self.imageURL = imageURL
         self.photoData = photoData
+        self.completionQrPayload = nil
+        self.completionNumericCode = nil
+        self.gamificationRewardData = nil
         self.createdAt = Date()
         self.updatedAt = Date()
         self.needsSync = true
@@ -144,6 +150,11 @@ final class Event: @unchecked Sendable {
         if let p = data["price"] as? Double { price = p }
         imageURL = data["image_url"] as? String
         organizerName = data["organizer_name"] as? String
+        completionQrPayload = data["completion_qr_payload"] as? String
+        completionNumericCode = data["completion_numeric_code"] as? String
+        if let reward = data["gamification_reward_json"] as? [String: Any] {
+            gamificationRewardData = LocalGamificationRule.encodeJSON(reward)
+        }
         needsSync = false
     }
 }

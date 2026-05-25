@@ -33,6 +33,7 @@ struct ActiveTrailView: View {
     @Environment(\.modelContext) private var modelContext
     @EnvironmentObject private var syncManager: SyncManager
     @EnvironmentObject private var userSession: UserSession
+    @EnvironmentObject private var gamificationService: GamificationService
     @ObservedObject private var localizer = LocalizationManager.shared
     @EnvironmentObject var accessibilityPreferences: AccessibilityPreferences
 
@@ -338,6 +339,7 @@ struct ActiveTrailView: View {
             Button {
                 if let first = trail.sortedSteps.first {
                     navigationState = .navigatingTo(first)
+                    gamificationService.trailStarted(trail)
                 }
             } label: {
                 Label(LocalizationManager.shared.localizedString(for: "start_trail"), systemImage: "figure.hiking")
@@ -478,12 +480,16 @@ struct ActiveTrailView: View {
                 )
                 progressRecord.visits.append(visit)
                 modelContext.insert(visit)
+                gamificationService.poiScanned(poi: poi, trail: trail, progress: progressRecord, visit: visit)
             }
             progressRecord.status = isCompleted ? .completed : .inProgress
             progressRecord.completedAt = isCompleted ? Date() : progressRecord.completedAt
             progressRecord.updatedAt = Date()
             progressRecord.needsSync = true
             try? modelContext.save()
+            if isCompleted {
+                gamificationService.trailCompleted(trail, progress: progressRecord)
+            }
             Task { await syncManager.pushPendingProgress(deviceId: userSession.deviceId) }
         }
     }
@@ -495,6 +501,7 @@ struct ActiveTrailView: View {
         progressRecord.updatedAt = Date()
         progressRecord.needsSync = true
         try? modelContext.save()
+        gamificationService.trailCompleted(trail, progress: progressRecord)
         Task { await syncManager.pushPendingProgress(deviceId: userSession.deviceId) }
     }
 }

@@ -525,6 +525,7 @@ struct GalleryVideoPlayerView: View {
 struct MediaDetailView: View {
     let content: Content
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var gamificationService: GamificationService
 
     var body: some View {
         NavigationStack {
@@ -536,7 +537,9 @@ struct MediaDetailView: View {
                     case .video:
                         EmptyView() // Handled in fullscreen gallery
                     case .audio:
-                        AudioPlayerView(url: localURL)
+                        AudioPlayerView(url: localURL) {
+                            gamificationService.audioGuideListened(content: content)
+                        }
                             .padding()
                     case .model3d:
                         Model3DView(url: localURL)
@@ -561,7 +564,9 @@ struct MediaDetailView: View {
                         case .video:
                             EmptyView() // Handled in fullscreen gallery
                         case .audio:
-                            AudioPlayerView(url: remoteURL)
+                            AudioPlayerView(url: remoteURL) {
+                                gamificationService.audioGuideListened(content: content)
+                            }
                                 .padding()
                         case .model3d:
                             Model3DView(url: remoteURL)
@@ -644,11 +649,13 @@ struct VideoPlayerView: View {
 // Offline-compatible Audio Player Card
 struct AudioPlayerView: View {
     let url: URL
+    var onCompleted: (() -> Void)? = nil
     @State private var audioPlayer: AVAudioPlayer?
     @State private var isPlaying = false
     @State private var progress: Double = 0.0
     @State private var timer: Timer?
     @State private var duration: TimeInterval = 0.0
+    @State private var hasReportedCompletion = false
 
     var body: some View {
         VStack(spacing: 24) {
@@ -745,6 +752,10 @@ struct AudioPlayerView: View {
         timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
             guard let player = audioPlayer, player.duration > 0 else { return }
             progress = player.currentTime / player.duration
+            if progress >= 0.8 && !hasReportedCompletion {
+                hasReportedCompletion = true
+                onCompleted?()
+            }
             if !player.isPlaying {
                 isPlaying = false
                 timer?.invalidate()

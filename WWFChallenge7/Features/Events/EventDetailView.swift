@@ -11,7 +11,13 @@ import SwiftUI
 struct EventDetailView: View {
     let event: Event
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var gamificationService: GamificationService
     @State private var startTrail = false
+    @State private var showCompletionScanner = false
+    @State private var showCompletionCodePrompt = false
+    @State private var completionCode = ""
+    @State private var completionMessage: String?
+    @State private var showCompletionMessage = false
     @ObservedObject private var localizer = LocalizationManager.shared
 
     var categoryColor: Color {
@@ -251,6 +257,49 @@ struct EventDetailView: View {
                             .padding(.horizontal, 16)
                         }
 
+                        if event.completionQrPayload != nil || event.completionNumericCode != nil {
+                            VStack(alignment: .leading, spacing: 12) {
+                                Text("Completamento evento")
+                                    .font(WWFDesign.Typography.sectionTitle)
+                                    .foregroundColor(WWFDesign.Colors.forestDark)
+
+                                HStack(spacing: 12) {
+                                    if event.completionQrPayload != nil {
+                                        Button {
+                                            showCompletionScanner = true
+                                        } label: {
+                                            Label("Scansiona QR", systemImage: "qrcode.viewfinder")
+                                                .font(.headline)
+                                                .foregroundColor(.white)
+                                                .frame(maxWidth: .infinity)
+                                                .padding()
+                                                .background(WWFDesign.Colors.forestMid)
+                                                .clipShape(RoundedRectangle(cornerRadius: WWFDesign.Radius.card))
+                                        }
+                                    }
+
+                                    if event.completionNumericCode != nil {
+                                        Button {
+                                            showCompletionCodePrompt = true
+                                        } label: {
+                                            Label("Codice", systemImage: "number")
+                                                .font(.headline)
+                                                .foregroundColor(WWFDesign.Colors.forestMid)
+                                                .frame(maxWidth: .infinity)
+                                                .padding()
+                                                .background(WWFDesign.Colors.forestMid.opacity(0.08))
+                                                .clipShape(RoundedRectangle(cornerRadius: WWFDesign.Radius.card))
+                                        }
+                                    }
+                                }
+                            }
+                            .padding(16)
+                            .background(Color(.systemBackground))
+                            .clipShape(RoundedRectangle(cornerRadius: WWFDesign.Radius.card))
+                            .shadow(color: Color.black.opacity(0.03), radius: 4, x: 0, y: 2)
+                            .padding(.horizontal, 16)
+                        }
+
                         // MARK: Avviso offline
                         HStack(spacing: 12) {
                             Image(systemName: "wifi.slash")
@@ -328,6 +377,32 @@ struct EventDetailView: View {
             .background(Color(.systemGroupedBackground).ignoresSafeArea())
         }
         .toolbar(.hidden)
+        .sheet(isPresented: $showCompletionScanner) {
+            QRScannerView { payload in
+                showCompletionScanner = false
+                gamificationService.eventCompleted(event, validationMethod: "qr", payload: payload)
+                completionMessage = "Completamento registrato."
+                showCompletionMessage = true
+            }
+            .ignoresSafeArea()
+        }
+        .alert("Codice completamento", isPresented: $showCompletionCodePrompt) {
+            TextField("Codice", text: $completionCode)
+            Button("Conferma") {
+                gamificationService.eventCompleted(event, validationMethod: "numeric_code", payload: completionCode)
+                completionCode = ""
+                completionMessage = "Completamento registrato."
+                showCompletionMessage = true
+            }
+            Button(localizer.localizedString(for: "cancel"), role: .cancel) {
+                completionCode = ""
+            }
+        }
+        .alert("Evento", isPresented: $showCompletionMessage) {
+            Button(localizer.localizedString(for: "ok_button"), role: .cancel) {}
+        } message: {
+            Text(completionMessage ?? "")
+        }
     }
 }
 

@@ -29,7 +29,17 @@ struct WWFChallenge7App: App {
                 LocalTrailProgress.self,
                 LocalPOIVisit.self,
                 SyncOutboxItem.self,
-                LocalBundleInstall.self
+                LocalBundleInstall.self,
+                LocalGamificationRule.self,
+                LocalGamificationLevel.self,
+                LocalUserGamificationStats.self,
+                LocalBadge.self,
+                LocalUserBadge.self,
+                LocalSpecies.self,
+                LocalUserSpecies.self,
+                LocalGamificationEventLog.self,
+                LocalValidationLog.self,
+                LocalGamificationRuleAward.self
             ])
             let config = ModelConfiguration(
                 schema: schema,
@@ -53,7 +63,17 @@ struct WWFChallenge7App: App {
                     LocalTrailProgress.self,
                     LocalPOIVisit.self,
                     SyncOutboxItem.self,
-                    LocalBundleInstall.self
+                    LocalBundleInstall.self,
+                    LocalGamificationRule.self,
+                    LocalGamificationLevel.self,
+                    LocalUserGamificationStats.self,
+                    LocalBadge.self,
+                    LocalUserBadge.self,
+                    LocalSpecies.self,
+                    LocalUserSpecies.self,
+                    LocalGamificationEventLog.self,
+                    LocalValidationLog.self,
+                    LocalGamificationRuleAward.self
                 ])
                 let config = ModelConfiguration(schema: schema)
                 container = try ModelContainer(for: schema, configurations: config)
@@ -67,6 +87,7 @@ struct WWFChallenge7App: App {
     @StateObject private var downloadManager = DownloadManager()
     @StateObject private var userSession = UserSession()
     @StateObject private var accessibilityPreferences = AccessibilityPreferences()
+    @StateObject private var gamificationService = GamificationService()
 
     var body: some Scene {
         WindowGroup {
@@ -76,10 +97,12 @@ struct WWFChallenge7App: App {
                 .environmentObject(downloadManager)
                 .environmentObject(userSession)
                 .environmentObject(accessibilityPreferences)
+                .environmentObject(gamificationService)
                 .task {
                     // 1. Configure managers with model context
                     syncManager.configure(with: container.mainContext)
                     downloadManager.configure(with: container.mainContext)
+                    gamificationService.configure(with: container.mainContext, userSession: userSession)
                     LocalizationManager.shared.configure(with: container)
 
                     // 2. Ensure anonymous profile exists
