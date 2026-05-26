@@ -71,18 +71,14 @@ struct EventDetailView: View {
                             
                             // Titolo dell'evento
                             Text(event.localizedName)
-                                .font(Font.custom("Georgia", size: 26, relativeTo: .title).weight(.bold))
+                                .font(.system(size: 32, weight: .semibold, design: .rounded))
                                 .foregroundColor(Color(red: 0.941, green: 0.929, blue: 0.902))
                                 .shadow(color: .black.opacity(0.2), radius: 4, x: 0, y: 2)
 
                             // Data e ora dell'evento
                             HStack(spacing: 12) {
-                                Label(event.formattedDate, systemImage: "calendar")
-                                    .font(WWFDesign.Typography.chipLabel)
-                                    .foregroundColor(WWFDesign.Colors.leafLight)
-                                Label(event.formattedTimeRange, systemImage: "clock")
-                                    .font(WWFDesign.Typography.chipLabel)
-                                    .foregroundColor(WWFDesign.Colors.leafLight)
+                                EventInfoChip(icon: "calendar", text: event.formattedDate, color: WWFDesign.Colors.leafLight, textColor: .white)
+                                EventInfoChip(icon: "clock", text: event.formattedTimeRange, color: WWFDesign.Colors.leafLight, textColor: .white)
                             }
                         }
                         .padding(20)
@@ -487,6 +483,7 @@ struct EventInfoChip: View {
     let icon: String
     let text: String
     let color: Color
+    var textColor: Color? = nil
 
     var body: some View {
         HStack(spacing: 6) {
@@ -496,6 +493,7 @@ struct EventInfoChip: View {
             Text(text)
                 .font(WWFDesign.Typography.metaLabel)
                 .fontWeight(.medium)
+                .foregroundColor(textColor ?? color)
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 7)
@@ -505,4 +503,23 @@ struct EventInfoChip: View {
             Capsule().stroke(color.opacity(0.2), lineWidth: 0.5)
         )
     }
+}
+
+#Preview {
+    EventDetailView(event: Event(
+        name: "Escursione al Cratere degli Astroni",
+        description: "Un'escursione guidata all'interno del cratere vulcanico degli Astroni, patrimonio naturale del WWF.",
+        category: .educational,
+        date: Calendar.current.date(byAdding: .day, value: 3, to: Date()) ?? Date(),
+        startTime: Calendar.current.date(bySettingHour: 9, minute: 0, second: 0, of: Date()) ?? Date(),
+        endTime: Calendar.current.date(bySettingHour: 13, minute: 0, second: 0, of: Date()) ?? Date(),
+        maxParticipants: 25,
+        organizerName: "WWF Italia — Oasi Astroni",
+        contactInfo: "oasi.astroni@wwf.it",
+        requirements: "Scarpe da trekking, acqua (almeno 1L), protezione solare.",
+        targetAudience: .families,
+        price: 0
+    ))
+    .environmentObject(GamificationService())
+    .environmentObject(AccessibilityPreferences())
 }

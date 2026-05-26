@@ -19,70 +19,96 @@ struct EventListView: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView(showsIndicators: false) {
-                VStack(alignment: .leading, spacing: 20) {
+            GeometryReader { geo in
+                ZStack(alignment: .topLeading) {
 
-                    // Premium Custom Organic Banner Header
-                    EventsHeaderView()
-                        .padding(.horizontal, 16)
-                        .padding(.top, 10)
+                    HStack(alignment: .top) {
+                        TopWavyShape()
+                            .fill(Color(red: 0.184, green: 0.110, blue: 0.102))
+                            .frame(width: geo.size.width, height: 165)
+                            .shadow(color: .black.opacity(0.30), radius: 6, x: 0, y: 3)
 
-                    // Today's Events
-                    let todayEvents = events.filter { $0.isToday }
-                    if !todayEvents.isEmpty {
-                        VStack(alignment: .leading, spacing: 12) {
-                            HStack(spacing: 8) {
-                                Image(systemName: "sparkles")
-                                    .foregroundColor(.orange)
-                                    .font(.body.weight(.bold))
-                                Text(localizer.localizedString(for: "today_oasis"))
+                        Spacer()
+                    }
+                    .ignoresSafeArea(edges: .top)
+                    
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Eventi")
+                            .font(.system(size: 28, weight: .bold, design: .rounded))
+                            .foregroundColor(.white)
+
+                        Text(localizer.localizedString(for: "explore"))
+                            .font(.system(size: 16, weight: .regular, design: .rounded))
+                            .foregroundColor(.white.opacity(0.88))
+                    }
+                    .padding(.leading, 22)
+
+                    ScrollView(showsIndicators: false) {
+                        VStack(alignment: .leading, spacing: 20) {
+
+                            EventsHeaderView()
+                                .padding(.horizontal, 16)
+                                .padding(.top, 10)
+
+                            // Today's Events
+                            let todayEvents = events.filter { $0.isToday }
+                            if !todayEvents.isEmpty {
+                                VStack(alignment: .leading, spacing: 12) {
+                                    HStack(spacing: 8) {
+                                        Image(systemName: "sparkles")
+                                            .foregroundColor(.orange)
+                                            .font(.body.weight(.bold))
+                                        Text(localizer.localizedString(for: "today_oasis"))
+                                            .font(WWFDesign.Typography.sectionTitle)
+                                            .foregroundColor(WWFDesign.Colors.forestDark)
+                                    }
+                                    .padding(.horizontal, 16)
+
+                                    ForEach(todayEvents) { event in
+                                        EventCardView(event: event, isHighlighted: true)
+                                            .padding(.horizontal, 16)
+                                            .onTapGesture { selectedEvent = event }
+                                    }
+                                }
+                            }
+
+                            let upcoming = events.filter { $0.isUpcoming && !$0.isToday }
+                            VStack(alignment: .leading, spacing: 12) {
+                                Text(localizer.localizedString(for: "upcoming_events"))
                                     .font(WWFDesign.Typography.sectionTitle)
                                     .foregroundColor(WWFDesign.Colors.forestDark)
-                            }
-                            .padding(.horizontal, 16)
-
-                            ForEach(todayEvents) { event in
-                                EventCardView(event: event, isHighlighted: true)
                                     .padding(.horizontal, 16)
-                                    .onTapGesture { selectedEvent = event }
+
+                                if upcoming.isEmpty && todayEvents.isEmpty {
+                                    ContentUnavailableView(
+                                        localizer.localizedString(for: "no_events_scheduled"),
+                                        systemImage: "calendar",
+                                        description: Text(localizer.localizedString(for: "no_events_scheduled_desc"))
+                                    )
+                                    .padding(.top, 40)
+                                } else if upcoming.isEmpty {
+                                    Text(localizer.localizedString(for: "no_other_events"))
+                                        .font(WWFDesign.Typography.trailDesc)
+                                        .foregroundColor(.secondary)
+                                        .padding(.horizontal, 16)
+                                } else {
+                                    ForEach(upcoming) { event in
+                                        EventCardView(event: event, isHighlighted: false)
+                                            .padding(.horizontal, 16)
+                                            .onTapGesture { selectedEvent = event }
+                                    }
+                                }
                             }
+
+                            Spacer(minLength: 40)
                         }
                     }
+                    .padding(.top, 100)
 
-                    // Upcoming Events
-                    let upcoming = events.filter { $0.isUpcoming && !$0.isToday }
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text(localizer.localizedString(for: "upcoming_events"))
-                            .font(WWFDesign.Typography.sectionTitle)
-                            .foregroundColor(WWFDesign.Colors.forestDark)
-                            .padding(.horizontal, 16)
-
-                        if upcoming.isEmpty && todayEvents.isEmpty {
-                            ContentUnavailableView(
-                                localizer.localizedString(for: "no_events_scheduled"),
-                                systemImage: "calendar",
-                                description: Text(localizer.localizedString(for: "no_events_scheduled_desc"))
-                            )
-                            .padding(.top, 40)
-                        } else if upcoming.isEmpty {
-                            Text(localizer.localizedString(for: "no_other_events"))
-                                .font(WWFDesign.Typography.trailDesc)
-                                .foregroundColor(.secondary)
-                                .padding(.horizontal, 16)
-                        } else {
-                            ForEach(upcoming) { event in
-                                EventCardView(event: event, isHighlighted: false)
-                                    .padding(.horizontal, 16)
-                                    .onTapGesture { selectedEvent = event }
-                            }
-                        }
-                    }
-
-                    Spacer(minLength: 40)
                 }
-                .padding(.vertical, 8)
             }
             .background(Color(.systemGroupedBackground).ignoresSafeArea())
+            .toolbarBackground(.hidden, for: .navigationBar)
             .fullScreenCover(item: $selectedEvent) { event in
                 EventDetailView(event: event)
             }
@@ -97,12 +123,10 @@ struct EventsHeaderView: View {
 
     var body: some View {
         ZStack(alignment: .bottomLeading) {
-            // Sfondo scuro cenere vulcanica / tramonto caldo
             RoundedRectangle(cornerRadius: WWFDesign.Radius.hero)
                 .fill(Color(red: 0.184, green: 0.110, blue: 0.102))
                 .frame(minHeight: 190)
 
-            // Pattern organico — cerchi sfumati vulcanici caldi
             GeometryReader { geo in
                 ZStack {
                     Circle()
@@ -122,24 +146,20 @@ struct EventsHeaderView: View {
             }
             .clipShape(RoundedRectangle(cornerRadius: WWFDesign.Radius.hero))
 
-            // Icona scintilla attività decorativa in alto a destra
             Image(systemName: "sparkles")
                 .font(.system(size: 110))
                 .foregroundColor(Color(red: 0.949, green: 0.600, blue: 0.290).opacity(0.07))
                 .rotationEffect(.degrees(-15))
-                .offset(x: geoSizeOffsetForEvents(), y: -20)
+                .offset(x: UIScreen.main.bounds.width - 180, y: -20)
                 .accessibilityHidden(true)
 
-            // Contenuto
             VStack(alignment: .leading, spacing: 8) {
-                // Badge eventi attivo
                 HStack(spacing: 5) {
                     Circle()
                         .fill(Color(red: 0.949, green: 0.600, blue: 0.290))
                         .frame(width: 6, height: 6)
                     Text(localizer.localizedString(for: "events_activities").uppercased())
-                        .font(WWFDesign.Typography.badge)
-                        .fontWeight(.bold)
+                        .font(.system(size: 12, weight: .bold, design: .rounded))
                         .foregroundColor(Color(red: 0.961, green: 0.769, blue: 0.588))
                 }
                 .padding(.horizontal, 10)
@@ -152,11 +172,10 @@ struct EventsHeaderView: View {
 
                 Spacer()
 
-                // Titolo principale
-                Text("Oasi Events")
-                    .font(WWFDesign.Typography.heroTitle)
+                Text("Oasis Events")
+                    .font(.system(size: 28, weight: .bold, design: .rounded))
                     .foregroundColor(.white)
-                
+
                 Text(localizer.localizedString(for: "events_oasis_desc"))
                     .font(WWFDesign.Typography.heroSubtitle)
                     .foregroundColor(.white.opacity(0.85))
@@ -165,10 +184,6 @@ struct EventsHeaderView: View {
             .frame(minHeight: 190, alignment: .leading)
         }
         .clipShape(RoundedRectangle(cornerRadius: WWFDesign.Radius.hero))
-    }
-
-    private func geoSizeOffsetForEvents() -> CGFloat {
-        return UIScreen.main.bounds.width - 180
     }
 }
 
@@ -185,15 +200,12 @@ struct EventCardView: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            // Elegant category accent bar on the left
             RoundedRectangle(cornerRadius: 0)
                 .fill(categoryColor)
                 .frame(width: 5)
-            
+
             VStack(alignment: .leading, spacing: 12) {
-                // Top row: category + today pill
                 HStack {
-                    // Category Badge
                     HStack(spacing: 4) {
                         Image(systemName: event.category.icon)
                             .font(.caption2.weight(.bold))
@@ -223,7 +235,6 @@ struct EventCardView: View {
                     }
                 }
 
-                // Title and description
                 HStack {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(event.localizedName)
@@ -241,7 +252,6 @@ struct EventCardView: View {
                         .foregroundColor(WWFDesign.Colors.forestMid.opacity(0.5))
                 }
 
-                // Info chips
                 HStack(spacing: 12) {
                     Label(event.formattedDate, systemImage: "calendar")
                         .font(WWFDesign.Typography.metaLabel)
@@ -263,7 +273,6 @@ struct EventCardView: View {
                     }
                 }
 
-                // Associated trail chip
                 if let trail = event.trail {
                     HStack(spacing: 6) {
                         Image(systemName: "signpost.right.and.left.fill")
@@ -297,4 +306,10 @@ struct EventCardView: View {
         .accessibilityHint("Tocca due volte per i dettagli dell'evento")
         .accessibilityAddTraits(.isButton)
     }
+}
+
+// MARK: - Preview
+
+#Preview {
+    EventListView()
 }
