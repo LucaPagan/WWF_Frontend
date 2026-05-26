@@ -16,6 +16,7 @@ struct CustomTabBar: View {
             HStack(spacing: 0) {
                 TabBarItem(
                     icon: "map",
+                    selectedIcon: "map.fill",
                     title: localizer.localizedString(for: "explore"),
                     isSelected: selectedTab == 0
                 ) {
@@ -24,6 +25,7 @@ struct CustomTabBar: View {
                 
                 TabBarItem(
                     icon: "calendar.badge.clock",
+                    selectedIcon: "calendar.badge.clock",
                     title: localizer.localizedString(for: "events"),
                     isSelected: selectedTab == 1
                 ) {
@@ -32,6 +34,7 @@ struct CustomTabBar: View {
                 
                 TabBarItem(
                     icon: "person",
+                    selectedIcon: "person.fill",
                     title: localizer.localizedString(for: "profile"),
                     isSelected: selectedTab == 2
                 ) {
@@ -46,9 +49,17 @@ struct CustomTabBar: View {
 
 struct TabBarItem: View {
     let icon: String
+    var selectedIcon: String? = nil
     let title: String
     let isSelected: Bool
     let action: () -> Void
+
+    private var activeIcon: String {
+        if isSelected {
+            return selectedIcon ?? "\(icon).fill"
+        }
+        return icon
+    }
     
     var body: some View {
         Button(action: action) {
@@ -60,7 +71,7 @@ struct TabBarItem: View {
                             .frame(width: 56, height: 56)
                     }
                     
-                    Image(systemName: isSelected ? icon + ".fill" : icon)
+                    Image(systemName: activeIcon)
                         .font(.system(size: 24, weight: isSelected ? .bold : .regular))
                         .foregroundColor(isSelected ? WWFDesign.Colors.forestDark : .white)
                 }

@@ -19,85 +19,35 @@ struct DownloadSelectionView: View {
     @ObservedObject private var localizer = LocalizationManager.shared
     
     @State private var selectedTier: ContentTier = .light
-    @State private var selectedLanguage: String = LocalizationManager.shared.preferredLanguage
-    @State private var showLanguagePicker = false
-    
-    let languages = [
-        ("it", "Italiano", "🇮🇹"),
-        ("en", "English", "🇬🇧"),
-        ("de", "Deutsch", "🇩🇪"),
-        ("fr", "Français", "🇫🇷")
-    ]
-    
+    private var selectedLanguage: String { LocalizationManager.shared.preferredLanguage }
+
     var body: some View {
         VStack(spacing: 0) {
-            // Drag indicator (simulated for better spacing)
-            Capsule()
-                .fill(Color.secondary.opacity(0.3))
-                .frame(width: 40, height: 5)
-                .padding(.top, 10)
-                .accessibilityHidden(true)
-
             ScrollView {
                 VStack(spacing: 0) {
                     // Header
                     VStack(spacing: 8) {
                         Text(localizer.localizedString(for: "prepare_trail"))
-                            .font(Font.custom("Georgia", size: 24, relativeTo: .title).weight(.bold))
+                            .font(.system(size: 30, weight: .bold, design: .rounded))
                             .foregroundColor(WWFDesign.Colors.forestDark)
                         Text(localizer.localizedString(for: "download_offline_desc"))
-                            .font(WWFDesign.Typography.trailDesc)
+                            .font(.system(size: 15))
                             .foregroundColor(.secondary)
                             .multilineTextAlignment(.center)
+                        
+                        Spacer()
                     }
                     .padding(.top, 24)
                     .padding(.horizontal)
                     .accessibilityElement(children: .combine)
-                    
-                    // Language Selection
-                    VStack(alignment: .leading, spacing: 16) {
-                        Text(localizer.localizedString(for: "content_language"))
-                            .font(WWFDesign.Typography.trailName)
-                            .foregroundColor(WWFDesign.Colors.forestDark)
-                            .padding(.horizontal)
-                        
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 12) {
-                                ForEach(languages, id: \.0) { lang in
-                                    Button {
-                                        selectedLanguage = lang.0
-                                    } label: {
-                                        HStack(spacing: 6) {
-                                            Text(lang.2)
-                                                .accessibilityHidden(true)
-                                            Text(lang.1)
-                                                .font(WWFDesign.Typography.metaLabel)
-                                        }
-                                        .padding(.horizontal, 16)
-                                        .padding(.vertical, 12)
-                                        .background(selectedLanguage == lang.0 ? WWFDesign.Colors.easyFill : Color.gray.opacity(0.08))
-                                        .foregroundColor(selectedLanguage == lang.0 ? WWFDesign.Colors.easyText : .primary)
-                                        .clipShape(Capsule())
-                                        .overlay(
-                                            Capsule()
-                                                .stroke(selectedLanguage == lang.0 ? WWFDesign.Colors.forestLight.opacity(0.4) : Color.clear, lineWidth: 1)
-                                        )
-                                    }
-                                    .accessibilityLabel("Lingua \(lang.1)")
-                                    .accessibilityAddTraits(selectedLanguage == lang.0 ? [.isSelected] : [])
-                                }
-                            }
-                            .padding(.horizontal)
-                        }
-                    }
-                    .padding(.vertical, 24)
-                    
+
                     // Tier Selection
                     VStack(alignment: .leading, spacing: 16) {
                         Text(localizer.localizedString(for: "choose_how_much_download"))
-                            .font(WWFDesign.Typography.trailName)
+                            .font(.system(size: 20, weight: .bold, design: .rounded))
                             .foregroundColor(WWFDesign.Colors.forestDark)
                             .padding(.horizontal)
+                            .padding(.top, 8)
                         
                         VStack(spacing: 16) {
                             ForEach(ContentTier.allCases, id: \.self) { tier in
@@ -323,3 +273,4 @@ struct TierSelectionRow: View {
         }
     }
 }
+

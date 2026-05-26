@@ -9,6 +9,8 @@
 import SwiftUI
 import SwiftData
 
+private let eventsHeaderShapeColor = Color(red: 0.690, green: 0.329, blue: 0.180)
+
 struct EventListView: View {
     @Query(filter: #Predicate<Event> { $0.isActive == true },
            sort: \Event.date, order: .forward)
@@ -24,7 +26,7 @@ struct EventListView: View {
 
                     HStack(alignment: .top) {
                         TopWavyShape()
-                            .fill(Color(red: 0.184, green: 0.110, blue: 0.102))
+                            .fill(eventsHeaderShapeColor)
                             .frame(width: geo.size.width, height: 165)
                             .shadow(color: .black.opacity(0.30), radius: 6, x: 0, y: 3)
 
@@ -75,7 +77,7 @@ struct EventListView: View {
                             let upcoming = events.filter { $0.isUpcoming && !$0.isToday }
                             VStack(alignment: .leading, spacing: 12) {
                                 Text(localizer.localizedString(for: "upcoming_events"))
-                                    .font(WWFDesign.Typography.sectionTitle)
+                                    .font(.system(size: 20, weight: .semibold, design: .rounded))
                                     .foregroundColor(WWFDesign.Colors.forestDark)
                                     .padding(.horizontal, 16)
 
@@ -124,7 +126,7 @@ struct EventsHeaderView: View {
     var body: some View {
         ZStack(alignment: .bottomLeading) {
             RoundedRectangle(cornerRadius: WWFDesign.Radius.hero)
-                .fill(Color(red: 0.184, green: 0.110, blue: 0.102))
+                .fill(eventsHeaderShapeColor)
                 .frame(minHeight: 190)
 
             GeometryReader { geo in

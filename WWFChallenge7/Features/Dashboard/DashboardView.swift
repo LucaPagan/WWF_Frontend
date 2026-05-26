@@ -67,7 +67,6 @@ struct DashboardView: View {
     @State private var trailToStart: Trail? = nil
     @State private var visibleTrailId: UUID? = nil
     @State private var is3DMap: Bool = false
-    @State private var showInfoSheet: Bool = false
     @ObservedObject private var localizer = LocalizationManager.shared
     @EnvironmentObject var accessibilityPreferences: AccessibilityPreferences
     @EnvironmentObject var syncManager: SyncManager
@@ -174,33 +173,7 @@ struct DashboardView: View {
                     }
                 }
                 .ignoresSafeArea(edges: .top)
-                
-                // Floating Info Button — right side, above the trail card
-                VStack {
-                    Spacer()
-                    HStack {
-                        Spacer()
-                        Button(action: {
-                            showInfoSheet = true
-                        }) {
-                            ZStack {
-                                Circle()
-                                    .fill(WWFDesign.Colors.forestLight)
-                                    .frame(width: 44, height: 44)
-                                    .shadow(color: .black.opacity(0.3), radius: 4, x: 0, y: 2)
-                                
-                                Image(systemName: "info")
-                                    .font(.system(size: 20, weight: .bold))
-                                    .foregroundColor(.white)
-                            }
-                        }
-                        .padding(.trailing, 20)
-                        .accessibilityLabel("Informazioni sull'Oasi")
-                        .accessibilityHint("Mostra dettagli sull'Oasi degli Astroni")
-                    }
-                    .padding(.bottom, 200) // Position above the trail card
-                }
-                
+
                 // Bottom Overlay: Trail Cards
                 if !displayedTrails.isEmpty {
                     ScrollView(.horizontal, showsIndicators: false) {
@@ -227,18 +200,13 @@ struct DashboardView: View {
                     }
                 }
             }
-            .sheet(isPresented: $showInfoSheet) {
-                OasiInfoSheetView()
-                    .presentationDetents([.medium])
-            }
-            .sheet(item: $selectedTrail) { trail in
+            .fullScreenCover(item: $selectedTrail) { trail in
                 DownloadSelectionView(trail: trail) {
                     selectedTrail = nil
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                         trailToStart = trail
                     }
                 }
-                .presentationDetents([.medium, .large])
             }
             .fullScreenCover(item: $trailToStart) { trail in
                 ActiveTrailView(trail: trail)
@@ -371,86 +339,6 @@ struct AstroniTrailCard: View {
         .accessibilityLabel("\(trail.localizedName). \(trail.localizedDescription). \(difficultyLabel). \(trail.estimatedMinutes ?? 60) minuti. \(trail.steps.count) tappe.")
         .accessibilityHint("Tocca due volte per aprire i dettagli del percorso")
         .accessibilityAddTraits(.isButton)
-    }
-}
-
-// MARK: - Oasi Info Sheet
-
-struct OasiInfoSheetView: View {
-    @ObservedObject private var localizer = LocalizationManager.shared
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
-                    // Hero icon
-                    HStack {
-                        Spacer()
-                        ZStack {
-                            Circle()
-                                .fill(WWFDesign.Colors.forestLight.opacity(0.15))
-                                .frame(width: 80, height: 80)
-                            Image(systemName: "leaf.fill")
-                                .font(.system(size: 36))
-                                .foregroundColor(WWFDesign.Colors.forestLight)
-                        }
-                        Spacer()
-                    }
-                    .padding(.top, 8)
-
-                    Text("L'Oasi degli Astroni è una riserva naturale situata all'interno di un antico cratere vulcanico nei Campi Flegrei, a Napoli. Gestita dal WWF Italia, ospita una ricca biodiversità con boschi, laghi e fauna selvatica.")
-                        .font(.system(size: 16))
-                        .foregroundColor(.secondary)
-                        .lineSpacing(4)
-
-                    // Info grid
-                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-                        InfoTile(icon: "mappin.circle.fill", title: "Posizione", value: "Napoli, Italia")
-                        InfoTile(icon: "tree.fill", title: "Tipo", value: "Riserva WWF")
-                        InfoTile(icon: "ruler", title: "Area", value: "247 ettari")
-                        InfoTile(icon: "calendar", title: "Dal", value: "1991")
-                    }
-                }
-                .padding(24)
-            }
-            .navigationTitle("Oasi degli Astroni")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button(action: { dismiss() }) {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            }
-        }
-    }
-}
-
-// MARK: - Info Tile
-
-private struct InfoTile: View {
-    let icon: String
-    let title: String
-    let value: String
-
-    var body: some View {
-        VStack(spacing: 8) {
-            Image(systemName: icon)
-                .font(.title2)
-                .foregroundColor(WWFDesign.Colors.forestLight)
-            Text(title)
-                .font(.caption)
-                .foregroundColor(.secondary)
-            Text(value)
-                .font(.subheadline)
-                .fontWeight(.semibold)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 16)
-        .background(Color(.systemGray6))
-        .clipShape(RoundedRectangle(cornerRadius: 14))
     }
 }
 
