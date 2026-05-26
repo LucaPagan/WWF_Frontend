@@ -8,6 +8,13 @@
 
 import SwiftUI
 
+private struct HeroHeaderHeightKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
+    }
+}
+
 struct EventDetailView: View {
     let event: Event
     @Environment(\.dismiss) private var dismiss
@@ -18,10 +25,18 @@ struct EventDetailView: View {
     @State private var completionCode = ""
     @State private var completionMessage: String?
     @State private var showCompletionMessage = false
+    @State private var heroHeaderHeight: CGFloat = 0
     @ObservedObject private var localizer = LocalizationManager.shared
 
     var categoryColor: Color {
         event.category.color
+    }
+
+    private var heroHeaderBackground: some View {
+        ZStack {
+            WWFDesign.Colors.forestDark
+            categoryColor.opacity(0.35)
+        }
     }
 
     var body: some View {
@@ -30,64 +45,8 @@ struct EventDetailView: View {
                 VStack(alignment: .leading, spacing: 20) {
 
                     // Premium Hero Header (Bleeds into notch / status bar)
-                    ZStack(alignment: .topLeading) {
-                        // Sfondo scuro bosco mescolato con la tonalità della categoria
-                        ZStack {
-                            WWFDesign.Colors.forestDark
-                            categoryColor.opacity(0.35)
-                        }
-                        .frame(minHeight: 260)
-                        
-                        // Pattern organico — cerchi sfumati che evocano vegetazione
-                        GeometryReader { geo in
-                            ZStack {
-                                Circle()
-                                    .fill(WWFDesign.Colors.forestMid)
-                                    .frame(width: 250, height: 250)
-                                    .blur(radius: 60)
-                                    .offset(x: geo.size.width * 0.5, y: -40)
-                                    .opacity(0.65)
-
-                                Circle()
-                                    .fill(WWFDesign.Colors.forestLight)
-                                    .frame(width: 140, height: 140)
-                                    .blur(radius: 40)
-                                    .offset(x: geo.size.width * 0.7, y: 80)
-                                    .opacity(0.3)
-                            }
-                        }
-                        
-                        // Foglia decorativa in alto a destra
-                        Image(systemName: "leaf.fill")
-                            .font(.system(size: 140))
-                            .foregroundColor(WWFDesign.Colors.leafGreen.opacity(0.06))
-                            .rotationEffect(.degrees(-25))
-                            .offset(x: UIScreen.main.bounds.width - 150, y: 30)
-                            .accessibilityHidden(true)
-                        
-                        // Contenuto testuale allineato in basso
-                        VStack(alignment: .leading, spacing: 8) {
-                            Spacer()
-                            
-                            // Titolo dell'evento
-                            Text(event.localizedName)
-                                .font(.system(size: 32, weight: .semibold, design: .rounded))
-                                .foregroundColor(Color(red: 0.941, green: 0.929, blue: 0.902))
-                                .shadow(color: .black.opacity(0.2), radius: 4, x: 0, y: 2)
-
-                            // Data e ora dell'evento
-                            HStack(spacing: 12) {
-                                EventInfoChip(icon: "calendar", text: event.formattedDate, color: WWFDesign.Colors.leafLight, textColor: .white)
-                                EventInfoChip(icon: "clock", text: event.formattedTimeRange, color: WWFDesign.Colors.leafLight, textColor: .white)
-                            }
-                        }
-                        .padding(20)
-                        .padding(.bottom, 24)
-                        .frame(minHeight: 260, alignment: .leading)
-                        
-                        // Top Row: Pulsante indietro e Categoria dell'evento sulla stessa riga
+                    VStack(alignment: .leading, spacing: 0) {
                         HStack(alignment: .center) {
-                            // Pulsante indietro floating botanico
                             Button {
                                 dismiss()
                             } label: {
@@ -99,7 +58,7 @@ struct EventDetailView: View {
                                             Circle().stroke(WWFDesign.Colors.leafGreen.opacity(0.35), lineWidth: 0.5)
                                         )
                                         .clipShape(Circle())
-                                    
+
                                     Image(systemName: "chevron.left")
                                         .font(.headline)
                                         .foregroundColor(WWFDesign.Colors.leafLight)
@@ -109,10 +68,22 @@ struct EventDetailView: View {
                                 .contentShape(Circle())
                             }
                             .accessibilityLabel("Torna indietro")
-                            
+
                             Spacer()
-                            
-                            // Badge Categoria allineato a destra
+                        }
+                        .padding(.top, 54)
+
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text(event.localizedName)
+                                .font(.system(size: 32, weight: .semibold, design: .rounded))
+                                .foregroundColor(Color(red: 0.941, green: 0.929, blue: 0.902))
+                                .shadow(color: .black.opacity(0.2), radius: 4, x: 0, y: 2)
+
+                            HStack(spacing: 12) {
+                                EventInfoChip(icon: "calendar", text: event.formattedDate, color: WWFDesign.Colors.leafLight, textColor: .white)
+                                EventInfoChip(icon: "clock", text: event.formattedTimeRange, color: WWFDesign.Colors.leafLight, textColor: .white)
+                            }
+
                             HStack(spacing: 5) {
                                 Image(systemName: event.category.icon)
                                     .font(.caption2.weight(.bold))
@@ -126,18 +97,46 @@ struct EventDetailView: View {
                             .background(categoryColor.opacity(0.75))
                             .clipShape(Capsule())
                         }
-                        .padding(.top, 54)
-                        .padding(.horizontal, 20)
+                        .padding(.top, 16)
                     }
-                    .frame(minHeight: 260)
-                    .clipShape(
-                        .rect(
-                            topLeadingRadius: 0,
-                            bottomLeadingRadius: WWFDesign.Radius.hero,
-                            bottomTrailingRadius: WWFDesign.Radius.hero,
-                            topTrailingRadius: 0
-                        )
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 16)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(
+                        GeometryReader { geo in
+                            Color.clear.preference(key: HeroHeaderHeightKey.self, value: geo.size.height)
+                        }
                     )
+                    .onPreferenceChange(HeroHeaderHeightKey.self) { heroHeaderHeight = $0 }
+                    .background {
+                        ZStack(alignment: .topTrailing) {
+                            heroHeaderBackground
+
+                            Circle()
+                                .fill(WWFDesign.Colors.forestMid)
+                                .frame(width: 250, height: 250)
+                                .blur(radius: 60)
+                                .offset(x: 60, y: -40)
+                                .opacity(0.65)
+
+                            Circle()
+                                .fill(WWFDesign.Colors.forestLight)
+                                .frame(width: 140, height: 140)
+                                .blur(radius: 40)
+                                .offset(x: 40, y: 60)
+                                .opacity(0.3)
+
+                            Image(systemName: "leaf.fill")
+                                .font(.system(size: 120))
+                                .foregroundColor(WWFDesign.Colors.leafGreen.opacity(0.06))
+                                .rotationEffect(.degrees(-25))
+                                .padding(.top, 20)
+                                .padding(.trailing, 8)
+                                .accessibilityHidden(true)
+                        }
+                        .ignoresSafeArea(edges: .top)
+                    }
+                    .clipShape(RoundedRectangle(cornerRadius: WWFDesign.Radius.hero))
 
                     VStack(spacing: 16) {
                         
@@ -370,9 +369,21 @@ struct EventDetailView: View {
                     Spacer(minLength: 32)
                 }
             }
-            .background(Color(.systemGroupedBackground).ignoresSafeArea())
+            .scrollContentBackground(.hidden)
+            .background(alignment: .top) {
+                VStack(spacing: 0) {
+                    if heroHeaderHeight > 0 {
+                        heroHeaderBackground
+                            .frame(height: heroHeaderHeight)
+                    }
+                    Color(.systemGroupedBackground)
+                }
+            }
+            .ignoresSafeArea(edges: .top)
         }
-        .toolbar(.hidden)
+        .background(Color(.systemGroupedBackground))
+        .toolbar(.hidden, for: .navigationBar)
+        .toolbarBackground(.hidden, for: .navigationBar)
         .sheet(isPresented: $showCompletionScanner) {
             QRScannerView { payload in
                 showCompletionScanner = false
