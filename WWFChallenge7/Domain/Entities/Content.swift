@@ -11,7 +11,7 @@ import SwiftData
 
 @Model
 final class Content {
-    var id: UUID
+    @Attribute(.unique) var id: UUID
     var poiId: UUID
     var typeRawValue: String
     var tierRawValue: String

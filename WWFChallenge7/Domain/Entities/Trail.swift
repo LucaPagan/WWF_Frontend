@@ -12,7 +12,7 @@ import SwiftUI
 
 @Model
 final class Trail: @unchecked Sendable {
-    var id: UUID
+    @Attribute(.unique) var id: UUID
     var name: String
     var trailDescription: String
     var isActive: Bool

@@ -305,6 +305,7 @@ actor UserSyncWorker: ModelActor {
 
     private func pullPOIs() async throws -> Int {
         let remotePOIs = try await networkClient.fetch(from: "pois", query: "select=*")
+        let remoteFactory = UserRemoteEntityFactory(modelContext: modelContext)
         var remoteIds = Set<UUID>()
         var count = 0
 
@@ -315,7 +316,7 @@ actor UserSyncWorker: ModelActor {
 
             if let existing = try modelContext.fetch(descriptor).first {
                 existing.updateFromRemote(data)
-            } else if let newPOI = createPOIFromRemote(data) {
+            } else if let newPOI = remoteFactory.makePOI(from: data) {
                 modelContext.insert(newPOI)
             }
             count += 1
@@ -328,6 +329,7 @@ actor UserSyncWorker: ModelActor {
 
     private func pullPaths() async throws -> Int {
         let remotePaths = try await networkClient.fetch(from: "paths", query: "select=*")
+        let remoteFactory = UserRemoteEntityFactory(modelContext: modelContext)
         var remoteIds = Set<UUID>()
         var count = 0
 
@@ -338,7 +340,7 @@ actor UserSyncWorker: ModelActor {
 
             if let existing = try modelContext.fetch(descriptor).first {
                 existing.updateFromRemote(data)
-            } else if let newTrail = createTrailFromRemote(data) {
+            } else if let newTrail = remoteFactory.makeTrail(from: data) {
                 modelContext.insert(newTrail)
             }
             count += 1
@@ -419,41 +421,19 @@ actor UserSyncWorker: ModelActor {
             from: "contents",
             query: "select=*&order=sort_order.asc"
         )
+        let remoteFactory = UserRemoteEntityFactory(modelContext: modelContext)
         var remoteIds = Set<UUID>()
         var count = 0
 
         for data in remoteContents {
             guard let idStr = data["id"] as? String, let remoteId = UUID(uuidString: idStr) else { continue }
-            guard let poiIdStr = data["poi_id"] as? String, let poiId = UUID(uuidString: poiIdStr) else { continue }
 
             remoteIds.insert(remoteId)
             let descriptor = FetchDescriptor<Content>(predicate: #Predicate { $0.id == remoteId })
 
             if let existing = try modelContext.fetch(descriptor).first {
                 existing.updateFromRemote(data)
-            } else {
-                let typeStr = data["type"] as? String ?? "text"
-                let tierStr = data["tier"] as? String ?? "light"
-                let content = Content(
-                    poiId: poiId,
-                    type: ContentType(rawValue: typeStr) ?? .text,
-                    tier: ContentTier(rawValue: tierStr) ?? .light,
-                    fileURL: data["file_url"] as? String,
-                    sortOrder: data["sort_order"] as? Int ?? 0,
-                    altText: data["alt_text"] as? String,
-                    durationSeconds: data["duration_seconds"] as? Int,
-                    languageCode: data["language_code"] as? String ?? "it",
-                    transcriptText: data["transcript_text"] as? String,
-                    hasEasyRead: data["has_easy_read"] as? Bool ?? false,
-                    subtitleURL: data["subtitle_url"] as? String,
-                    fixedID: remoteId
-                )
-                // Handle JSONB data field
-                if let jsonObj = data["data"], !(jsonObj is NSNull) {
-                    if JSONSerialization.isValidJSONObject(jsonObj) {
-                        content.data = try? JSONSerialization.data(withJSONObject: jsonObj)
-                    }
-                }
+            } else if let content = remoteFactory.makeContent(from: data) {
                 modelContext.insert(content)
             }
             count += 1
@@ -466,6 +446,7 @@ actor UserSyncWorker: ModelActor {
 
     private func pullEvents() async throws -> Int {
         let remoteEvents = try await networkClient.fetch(from: "events", query: "select=*")
+        let remoteFactory = UserRemoteEntityFactory(modelContext: modelContext)
         var remoteIds = Set<UUID>()
         var count = 0
 
@@ -476,7 +457,7 @@ actor UserSyncWorker: ModelActor {
 
             if let existing = try modelContext.fetch(descriptor).first {
                 existing.updateFromRemote(data)
-            } else if let newEvent = createEventFromRemote(data) {
+            } else if let newEvent = remoteFactory.makeEvent(from: data) {
                 modelContext.insert(newEvent)
             }
             count += 1
@@ -495,12 +476,12 @@ actor UserSyncWorker: ModelActor {
             from: "download_packages",
             query: "select=*"
         )
+        let remoteFactory = UserRemoteEntityFactory(modelContext: modelContext)
         var remoteIds = Set<UUID>()
         var count = 0
 
         for data in remotePackages {
             guard let idStr = data["id"] as? String, let remoteId = UUID(uuidString: idStr) else { continue }
-            guard let pathIdStr = data["path_id"] as? String, let pathId = UUID(uuidString: pathIdStr) else { continue }
 
             remoteIds.insert(remoteId)
 
@@ -508,20 +489,8 @@ actor UserSyncWorker: ModelActor {
 
             if let existing = try modelContext.fetch(descriptor).first {
                 existing.updateFromRemote(data)
-            } else {
-                let tierStr = data["tier"] as? String ?? "light"
-                let pkg = DownloadPackage(
-                    pathId: pathId,
-                    tier: ContentTier(rawValue: tierStr) ?? .light,
-                    sizeBytes: (data["size_bytes"] as? Int64) ?? Int64(data["size_bytes"] as? Int ?? 0),
-                    includesVideo: data["includes_video"] as? Bool ?? false,
-                    includes3D: data["includes_3d"] as? Bool ?? false,
-                    bundleURL: data["bundle_url"] as? String,
-                    isReady: data["is_ready"] as? Bool ?? false,
-                    fixedID: remoteId
-                )
-                pkg.updateFromRemote(data)
-                modelContext.insert(pkg)
+            } else if let package = remoteFactory.makeDownloadPackage(from: data) {
+                modelContext.insert(package)
             }
             count += 1
         }
@@ -569,122 +538,4 @@ actor UserSyncWorker: ModelActor {
         }
     }
 
-    // MARK: - Factory Methods
-
-    private func createPOIFromRemote(_ data: [String: Any]) -> POI? {
-        guard let idStr = data["id"] as? String,
-              let id = UUID(uuidString: idStr),
-              let name = data["name"] as? String,
-              let desc = data["poi_description"] as? String,
-              let x = data["x"] as? Double,
-              let y = data["y"] as? Double else { return nil }
-
-        let typeStr = data["type"] as? String ?? "landmark"
-        let poiType = POIType.fromSupabase(typeStr) ?? .landmark
-
-        let poi = POI(
-            name: name,
-            description: desc,
-            x: x,
-            y: y,
-            latitude: data["latitude"] as? Double,
-            longitude: data["longitude"] as? Double,
-            type: poiType,
-            photoURL: data["photo_url"] as? String,
-            isStartPoint: data["is_start_point"] as? Bool ?? false,
-            isActive: data["is_active"] as? Bool ?? true,
-            iconName: data["icon_name"] as? String,
-            numericCode: data["numeric_code"] as? String,
-            descriptionKids: data["description_kids"] as? String,
-            descriptionEasyRead: data["description_easy_read"] as? String,
-            fixedID: id
-        )
-        poi.qrPayload = data["qr_payload"] as? String ?? "ASTRONI_POI_\(id.uuidString)"
-        poi.needsSync = false
-        return poi
-    }
-
-    private func createTrailFromRemote(_ data: [String: Any]) -> Trail? {
-        guard let idStr = data["id"] as? String,
-              let id = UUID(uuidString: idStr),
-              let name = data["name"] as? String else { return nil }
-
-        let diffStr = data["difficulty"] as? String
-        let difficulty = diffStr.flatMap { TrailDifficulty.fromSupabase($0) }
-
-        let startPOIIdStr = data["start_poi_id"] as? String
-        let startPOIId = startPOIIdStr.flatMap { UUID(uuidString: $0) }
-
-        let trail = Trail(
-            name: name,
-            description: data["description"] as? String ?? "",
-            isActive: data["is_active"] as? Bool ?? false,
-            difficulty: difficulty,
-            estimatedMinutes: data["estimated_minutes"] as? Int,
-            coverImageURL: data["cover_image_url"] as? String,
-            startPOIId: startPOIId,
-            targetAge: data["target_age"] as? String,
-            descriptionKids: data["description_kids"] as? String,
-            descriptionEasyRead: data["description_easy_read"] as? String,
-            fixedID: id
-        )
-        trail.needsSync = false
-        return trail
-    }
-
-    private func createEventFromRemote(_ data: [String: Any]) -> Event? {
-        guard let idStr = data["id"] as? String,
-              let id = UUID(uuidString: idStr),
-              let name = data["name"] as? String else { return nil }
-
-        let catStr = data["category"] as? String ?? "other"
-        let category = EventCategory.fromSupabase(catStr) ?? .other
-        let audienceStr = data["target_audience"] as? String ?? "all"
-        let audience = EventAudience.fromSupabase(audienceStr) ?? .all
-
-        // Parse date and times
-        let dateFmt = DateFormatter()
-        dateFmt.dateFormat = "yyyy-MM-dd"
-        let timeFmt = DateFormatter()
-        timeFmt.dateFormat = "HH:mm:ss"
-
-        let dateStr = data["date"] as? String ?? ""
-        let eventDate = dateFmt.date(from: dateStr) ?? Date()
-
-        let startStr = data["time_start"] as? String ?? "09:00:00"
-        let endStr = data["time_end"] as? String ?? "17:00:00"
-        let startTime = timeFmt.date(from: startStr) ?? Date()
-        let endTime = timeFmt.date(from: endStr) ?? Date()
-
-        let event = Event(
-            name: name,
-            description: data["description"] as? String ?? "",
-            category: category,
-            date: eventDate,
-            startTime: startTime,
-            endTime: endTime,
-            maxParticipants: data["max_participants"] as? Int,
-            organizerName: data["organizer_name"] as? String,
-            contactInfo: data["contact_info"] as? String,
-            requirements: data["requirements"] as? String,
-            targetAudience: audience,
-            price: data["price"] as? Double ?? 0,
-            imageURL: data["image_url"] as? String,
-            fixedID: id
-        )
-        event.isActive = data["is_active"] as? Bool ?? false
-        event.needsSync = false
-
-        // Link trail and POI if present
-        if let pathIdStr = data["path_id"] as? String, let pathId = UUID(uuidString: pathIdStr) {
-            let trailDescriptor = FetchDescriptor<Trail>(predicate: #Predicate { $0.id == pathId })
-            event.trail = try? modelContext.fetch(trailDescriptor).first
-        }
-        if let poiIdStr = data["event_poi_id"] as? String, let poiId = UUID(uuidString: poiIdStr) {
-            let poiDescriptor = FetchDescriptor<POI>(predicate: #Predicate { $0.id == poiId })
-            event.eventPOI = try? modelContext.fetch(poiDescriptor).first
-        }
-
-        return event
-    }
 }

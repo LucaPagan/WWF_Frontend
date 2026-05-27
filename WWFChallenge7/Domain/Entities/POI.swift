@@ -12,7 +12,7 @@ import SwiftUI
 
 @Model
 final class POI: @unchecked Sendable {
-    var id: UUID
+    @Attribute(.unique) var id: UUID
     var name: String
     var poiDescription: String
     var x: Double
