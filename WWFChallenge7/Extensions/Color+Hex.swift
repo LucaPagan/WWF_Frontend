@@ -18,3 +18,6 @@ extension Color {
         self.init(red: r, green: g, blue: b)
     }
 }
+
+let customHeaderOrange = Color(hex: "#96503C")
+let customEventCardBrown = Color(hex: "#854F0B")
