@@ -12,7 +12,7 @@ import SwiftUI
 
 @Model
 final class Event: @unchecked Sendable {
-    var id: UUID
+    @Attribute(.unique) var id: UUID
     var name: String
     var eventDescription: String
     var categoryRawValue: String

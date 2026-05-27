@@ -15,7 +15,7 @@ enum LocalVisitSource: String, Codable, CaseIterable {
 
 @Model
 final class LocalTrailProgress {
-    var id: UUID
+    @Attribute(.unique) var id: UUID
     var pathId: UUID
     var packageId: UUID?
     var statusRawValue: String
@@ -54,7 +54,7 @@ final class LocalTrailProgress {
 
 @Model
 final class LocalPOIVisit {
-    var id: UUID
+    @Attribute(.unique) var id: UUID
     var progressId: UUID
     var poiId: UUID
     var scannedAt: Date
@@ -85,7 +85,7 @@ final class LocalPOIVisit {
 
 @Model
 final class SyncOutboxItem {
-    var id: UUID
+    @Attribute(.unique) var id: UUID
     var kind: String
     var payloadData: Data
     var attemptCount: Int
@@ -106,7 +106,7 @@ final class SyncOutboxItem {
 
 @Model
 final class LocalBundleInstall {
-    var id: UUID
+    @Attribute(.unique) var id: UUID
     var packageId: UUID
     var pathId: UUID
     var tierRawValue: String

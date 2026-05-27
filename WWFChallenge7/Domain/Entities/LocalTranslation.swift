@@ -10,7 +10,7 @@ import SwiftData
 
 @Model
 final class LocalTranslation: @unchecked Sendable {
-    var id: UUID
+    @Attribute(.unique) var id: UUID
     var tableName: String
     var recordId: UUID
     var fieldName: String

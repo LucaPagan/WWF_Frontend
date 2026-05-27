@@ -17,7 +17,7 @@ enum LocalValidationStatus: String, Codable, CaseIterable {
 
 @Model
 final class LocalGamificationRule {
-    var id: UUID
+    @Attribute(.unique) var id: UUID
     var title: String
     var ruleDescription: String?
     var triggerType: String
@@ -114,7 +114,7 @@ final class LocalGamificationRule {
 
 @Model
 final class LocalGamificationLevel {
-    var id: UUID
+    @Attribute(.unique) var id: UUID
     var levelNumber: Int
     var title: String
     var levelDescription: String?
@@ -163,7 +163,7 @@ final class LocalGamificationLevel {
 
 @Model
 final class LocalUserGamificationStats {
-    var id: UUID
+    @Attribute(.unique) var id: UUID
     var userId: UUID?
     var deviceId: String
     var xpTotal: Int
@@ -214,7 +214,7 @@ final class LocalUserGamificationStats {
 
 @Model
 final class LocalBadge {
-    var id: UUID
+    @Attribute(.unique) var id: UUID
     var name: String
     var badgeDescription: String?
     var iconName: String?
@@ -278,7 +278,7 @@ final class LocalBadge {
 
 @Model
 final class LocalUserBadge {
-    var id: UUID
+    @Attribute(.unique) var id: UUID
     var userId: UUID?
     var deviceId: String
     var badgeId: UUID
@@ -306,7 +306,7 @@ final class LocalUserBadge {
 
 @Model
 final class LocalSpecies {
-    var id: UUID
+    @Attribute(.unique) var id: UUID
     var name: String
     var scientificName: String?
     var speciesDescription: String
@@ -367,7 +367,7 @@ final class LocalSpecies {
 
 @Model
 final class LocalUserSpecies {
-    var id: UUID
+    @Attribute(.unique) var id: UUID
     var userId: UUID?
     var deviceId: String
     var speciesId: UUID
@@ -399,7 +399,7 @@ final class LocalUserSpecies {
 
 @Model
 final class LocalGamificationEventLog {
-    var id: UUID
+    @Attribute(.unique) var id: UUID
     var triggerType: String
     var entityType: String?
     var entityId: UUID?
@@ -433,7 +433,7 @@ final class LocalGamificationEventLog {
 
 @Model
 final class LocalValidationLog {
-    var id: UUID
+    @Attribute(.unique) var id: UUID
     var eventType: String
     var entityType: String?
     var entityId: UUID?
@@ -461,7 +461,7 @@ final class LocalValidationLog {
 
 @Model
 final class LocalGamificationRuleAward {
-    var id: UUID
+    @Attribute(.unique) var id: UUID
     var ruleId: UUID
     var dedupeKey: String
     var awardedAt: Date
