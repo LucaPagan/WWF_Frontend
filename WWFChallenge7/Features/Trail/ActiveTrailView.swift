@@ -128,7 +128,6 @@ struct ActiveTrailView: View {
         // ── Top-leading controls ──────────────────────────────────────────────
         .overlay(alignment: .topLeading) {
             VStack(spacing: 16) {
-                // Dimissione vetrosa organica
                 Button { dismiss() } label: {
                     ZStack {
                         Circle()
@@ -138,7 +137,7 @@ struct ActiveTrailView: View {
                                 Circle().stroke(WWFDesign.Colors.leafGreen.opacity(0.35), lineWidth: 0.5)
                             )
                             .clipShape(Circle())
-                        
+
                         Image(systemName: "xmark")
                             .font(.headline)
                             .foregroundColor(WWFDesign.Colors.leafLight)
@@ -172,7 +171,7 @@ struct ActiveTrailView: View {
             ZStack(alignment: .bottom) {
                 QRScannerView { payload in handleQRScan(payload: payload) }
                     .ignoresSafeArea()
-                
+
                 Button {
                     showManualCode = true
                 } label: {
@@ -291,7 +290,7 @@ struct ActiveTrailView: View {
                         Circle().stroke(WWFDesign.Colors.leafGreen.opacity(0.35), lineWidth: 0.5)
                     )
                     .clipShape(Circle())
-                
+
                 Image(systemName: mapIconName)
                     .font(.headline)
                     .foregroundColor(WWFDesign.Colors.leafLight)
@@ -347,7 +346,7 @@ struct ActiveTrailView: View {
                     .foregroundColor(.white)
                     .frame(maxWidth: .infinity)
                     .padding()
-                    .background(WWFDesign.Colors.forestMid)
+                    .background(WWFDesign.Colors.forestLight)
                     .clipShape(RoundedRectangle(cornerRadius: WWFDesign.Radius.card))
                     .shadow(color: WWFDesign.Colors.forestMid.opacity(0.2), radius: 6, x: 0, y: 3)
             }
@@ -390,7 +389,7 @@ struct ActiveTrailView: View {
     private func handleQRScan(payload: String) {
         showScanner = false
         let clean = payload.trimmingCharacters(in: .whitespacesAndNewlines)
-        
+
         scannedPOI = nil
         qrErrorMessage = ""
 
@@ -508,38 +507,60 @@ struct ActiveTrailView: View {
 
 // MARK: - StartPointCard
 
-struct StartPointCard: View {
+private struct StartPointCard: View {
     let name: String
     let description: String
     let nextStepInstructions: String?
+    @ObservedObject private var localizer = LocalizationManager.shared
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 10) {
-                ZStack {
-                    Circle().fill(WWFDesign.Colors.forestLight).frame(width: 36, height: 36)
-                    Image(systemName: "flag.fill").font(.caption).foregroundColor(.white)
+        HStack(spacing: 0) {
+            ZStack {
+                CardBlobShape()
+                    .fill(WWFDesign.Colors.forestLight)
+                CardBlobShape()
+                    .stroke(Color.black, lineWidth: 2.5)
+            }
+            .frame(width: 32)
+
+            VStack(alignment: .leading, spacing: 12) {
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "flag.fill")
+                            .font(.caption)
+                            .foregroundColor(WWFDesign.Colors.forestLight)
+                        Text("\(localizer.localizedString(for: "you_are_here")): \(name)")
+                            .font(.system(size: 22, weight: .bold, design: .rounded))
+                            .foregroundColor(.black)
+                    }
+                    Text(description)
+                        .font(.system(size: 15, weight: .regular))
+                        .foregroundColor(.black.opacity(0.8))
+                        .lineLimit(3)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("\(LocalizationManager.shared.localizedString(for: "you_are_here")): \(name)")
-                        .font(.subheadline)
-                        .fontWeight(.bold)
-                        .foregroundColor(WWFDesign.Colors.forestDark)
-                    Text(description).font(.caption).foregroundColor(.secondary).lineLimit(2)
+
+                if let instructions = nextStepInstructions {
+                    HStack(alignment: .top, spacing: 8) {
+                        Image(systemName: "arrow.turn.up.right")
+                            .font(.caption)
+                            .foregroundColor(Color(red: 0.522, green: 0.310, blue: 0.043))
+                            .padding(.top, 2)
+                        Text(instructions)
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(.black)
+                            .lineLimit(3)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
             }
-            if let instructions = nextStepInstructions {
-                Divider()
-                HStack(spacing: 8) {
-                    Image(systemName: "arrow.turn.up.right")
-                        .foregroundColor(WWFDesign.Colors.forestLight).font(.caption)
-                    Text(instructions).font(.caption).foregroundColor(.secondary).lineLimit(3)
-                }
-            }
+            .padding(.vertical, 20)
+            .padding(.trailing, 20)
+            .padding(.leading, 12)
         }
-        .padding()
-        .background(WWFDesign.Colors.forestLight.opacity(0.08))
-        .clipShape(RoundedRectangle(cornerRadius: WWFDesign.Radius.card))
+        .background(Color.white)
+        .clipShape(RoundedRectangle(cornerRadius: 24))
+        .overlay(RoundedRectangle(cornerRadius: 24).stroke(Color.black, lineWidth: 2.5))
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Punto di partenza: \(name). \(description). \(nextStepInstructions ?? "")")
     }
@@ -547,65 +568,120 @@ struct StartPointCard: View {
 
 // MARK: - NavigatingCard
 
-    struct NavigatingCard: View {
-        let step: TrailStep
-        
-        var body: some View {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(spacing: 10) {
-                    ZStack {
-                        Circle().fill(Color.orange).frame(width: 36, height: 36)
+private struct NavigatingCard: View {
+    let step: TrailStep
+    @ObservedObject private var localizer = LocalizationManager.shared
+
+    var body: some View {
+        HStack(spacing: 0) {
+            ZStack {
+                CardBlobShape()
+                    .fill(Color.orange)
+                CardBlobShape()
+                    .stroke(Color.black, lineWidth: 2.5)
+            }
+            .frame(width: 32)
+
+            VStack(alignment: .leading, spacing: 12) {
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(spacing: 6) {
                         Image(systemName: "arrow.triangle.turn.up.right.circle.fill")
-                            .font(.caption).foregroundColor(.white)
-                    }
-                    VStack(alignment: .leading, spacing: 2) {
+                            .font(.caption)
+                            .foregroundColor(.orange)
                         if let poi = step.poi {
-                            Text("\(LocalizationManager.shared.localizedString(for: "go_to")): \(poi.localizedName)")
-                                .font(.subheadline)
-                                .fontWeight(.bold)
-                                .foregroundColor(WWFDesign.Colors.forestDark)
+                            Text("\(localizer.localizedString(for: "go_to")): \(poi.localizedName)")
+                                .font(.system(size: 22, weight: .bold, design: .rounded))
+                                .foregroundColor(.black)
                         }
-                        Text(LocalizationManager.shared.localizedString(for: "scan_qr_desc")).font(.caption).foregroundColor(.secondary)
                     }
+                    Text(localizer.localizedString(for: "scan_qr_desc"))
+                        .font(.system(size: 15, weight: .regular))
+                        .foregroundColor(.black.opacity(0.8))
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-                Divider()
+
                 HStack(alignment: .top, spacing: 8) {
                     Image(systemName: "arrow.turn.up.right")
-                        .foregroundColor(.orange).font(.caption).padding(.top, 2)
-                    Text(step.instructions).font(.caption).foregroundColor(.secondary).lineLimit(4)
+                        .font(.caption)
+                        .foregroundColor(Color(red: 0.522, green: 0.310, blue: 0.043))
+                        .padding(.top, 2)
+                    Text(step.instructions)
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(.black)
+                        .lineLimit(4)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                HStack(spacing: 16) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "ruler")
+                            .font(.caption)
+                            .foregroundColor(Color(red: 0.522, green: 0.310, blue: 0.043))
+                        Text("\(step.distanceMeters) m")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(.black)
+                    }
+                    HStack(spacing: 4) {
+                        Image(systemName: "clock")
+                            .font(.caption)
+                            .foregroundColor(Color(red: 0.522, green: 0.310, blue: 0.043))
+                        Text("~\(step.estimatedMinutes) min")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(.black)
+                    }
                 }
             }
-            .padding()
-            .background(Color.orange.opacity(0.08))
-            .clipShape(RoundedRectangle(cornerRadius: WWFDesign.Radius.card))
-            .accessibilityElement(children: .combine)
-            .accessibilityLabel("Prossima tappa: \(step.poi?.localizedName ?? ""). \(step.instructions). Distanza: \(step.distanceMeters) metri, circa \(step.estimatedMinutes) minuti.")
+            .padding(.vertical, 20)
+            .padding(.trailing, 20)
+            .padding(.leading, 12)
         }
+        .background(Color.white)
+        .clipShape(RoundedRectangle(cornerRadius: 24))
+        .overlay(RoundedRectangle(cornerRadius: 24).stroke(Color.black, lineWidth: 2.5))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Prossima tappa: \(step.poi?.localizedName ?? ""). \(step.instructions). Distanza: \(step.distanceMeters) metri, circa \(step.estimatedMinutes) minuti.")
     }
+}
 
 // MARK: - POIReachedCard
 
-struct POIReachedCard: View {
+private struct POIReachedCard: View {
     let poi: POI
+    @ObservedObject private var localizer = LocalizationManager.shared
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 0) {
             ZStack {
-                Circle().fill(WWFDesign.Colors.leafGreen).frame(width: 36, height: 36)
-                Image(systemName: "checkmark").font(.caption).fontWeight(.bold).foregroundColor(.white)
+                CardBlobShape()
+                    .fill(WWFDesign.Colors.leafGreen)
+                CardBlobShape()
+                    .stroke(Color.black, lineWidth: 2.5)
             }
-            VStack(alignment: .leading, spacing: 2) {
-                Text("\(LocalizationManager.shared.localizedString(for: "reached")): \(poi.localizedName)")
-                    .font(.subheadline)
-                    .fontWeight(.bold)
-                    .foregroundColor(WWFDesign.Colors.forestDark)
-                Text(LocalizationManager.shared.localizedString(for: "view_info")).font(.caption).foregroundColor(.secondary)
+            .frame(width: 32)
+
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 6) {
+                    Image(systemName: "checkmark.seal.fill")
+                        .font(.caption)
+                        .foregroundColor(WWFDesign.Colors.leafGreen)
+                    Text("\(localizer.localizedString(for: "reached")): \(poi.localizedName)")
+                        .font(.system(size: 22, weight: .bold, design: .rounded))
+                        .foregroundColor(.black)
+                }
+                Text(localizer.localizedString(for: "view_info"))
+                    .font(.system(size: 15, weight: .regular))
+                    .foregroundColor(.black.opacity(0.8))
             }
+            .padding(.vertical, 20)
+            .padding(.trailing, 20)
+            .padding(.leading, 12)
+
             Spacer()
         }
-        .padding()
-        .background(WWFDesign.Colors.leafGreen.opacity(0.08))
-        .clipShape(RoundedRectangle(cornerRadius: WWFDesign.Radius.card))
+        .background(Color.white)
+        .clipShape(RoundedRectangle(cornerRadius: 24))
+        .overlay(RoundedRectangle(cornerRadius: 24).stroke(Color.black, lineWidth: 2.5))
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Raggiunto: \(poi.localizedName). Tocca per visualizzare le informazioni.")
     }
