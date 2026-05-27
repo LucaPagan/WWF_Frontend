@@ -11,7 +11,7 @@ import SwiftData
 
 @Model
 final class UserProfile: @unchecked Sendable {
-    var id: UUID
+    @Attribute(.unique) var id: UUID
     var deviceId: String
     var isAnonymous: Bool
     var email: String?

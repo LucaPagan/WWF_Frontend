@@ -11,7 +11,7 @@ import SwiftData
 
 @Model
 final class DownloadPackage {
-    var id: UUID
+    @Attribute(.unique) var id: UUID
     var pathId: UUID
     var tierRawValue: String
     var sizeBytes: Int64
