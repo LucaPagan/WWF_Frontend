@@ -232,6 +232,7 @@ struct DashboardView: View {
 
 struct AstroniTrailCard: View {
     let trail: Trail
+    var interactive: Bool = true
     @ObservedObject private var localizer = LocalizationManager.shared
 
     private var difficulty: TrailDifficulty { trail.difficulty ?? .easy }
@@ -337,8 +338,8 @@ struct AstroniTrailCard: View {
         .overlay(RoundedRectangle(cornerRadius: 24).stroke(Color.black, lineWidth: 2.5))
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(trail.localizedName). \(trail.localizedDescription). \(difficultyLabel). \(trail.estimatedMinutes ?? 60) minuti. \(trail.steps.count) tappe.")
-        .accessibilityHint("Tocca due volte per aprire i dettagli del percorso")
-        .accessibilityAddTraits(.isButton)
+        .accessibilityHint(interactive ? "Tocca due volte per aprire i dettagli del percorso" : "")
+        .accessibilityAddTraits(interactive ? .isButton : [])
     }
 }
 
