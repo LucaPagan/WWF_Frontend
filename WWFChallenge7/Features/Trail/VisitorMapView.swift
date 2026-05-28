@@ -46,8 +46,8 @@ struct VisitorMapView: UIViewRepresentable {
         var mapImageViews: [UIImageView] = []
         var loadedPieces: [UIImage] = []
         var missingPiece = false
-
-        for i in 1...7 {
+        
+        for i in 0...38{
             if let piece = UIImage(named: "astroni_map_piece_\(i)") {
                 loadedPieces.append(piece)
             } else {
@@ -57,8 +57,8 @@ struct VisitorMapView: UIViewRepresentable {
         }
 
         let isUsingPieces: Bool
-
-        if !missingPiece && loadedPieces.count == 7 {
+        
+        if !missingPiece && loadedPieces.count == 39 {
             isUsingPieces = true
             for piece in loadedPieces {
                 let imageView = UIImageView(image: piece)
