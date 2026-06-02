@@ -357,6 +357,7 @@ final class SupabaseConfig: NetworkClient, @unchecked Sendable {
         request.httpMethod = "GET"
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue(projectURL, forHTTPHeaderField: "X-Client-Origin")
         if let token = accessToken {
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         } else {
@@ -374,17 +375,25 @@ final class SupabaseConfig: NetworkClient, @unchecked Sendable {
 
     // MARK: - Storage Download (User module addition)
 
-    func downloadFile(from url: String) async throws -> Data {
-        // Fix-up URL if it's a Supabase Storage URL missing the access tier (/public/ or /authenticated/)
-        var sanitizedURL = url
-        if url.contains("/storage/v1/object/") && 
-           !url.contains("/object/public/") && 
-           !url.contains("/object/authenticated/") {
-            sanitizedURL = url.replacingOccurrences(of: "/object/", with: "/object/public/")
+    func publicStorageURL(for reference: String) -> URL? {
+        let trimmed = reference.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+
+        if let url = URL(string: trimmed), url.scheme != nil {
+            if trimmed.contains("/storage/v1/object/"),
+               !trimmed.contains("/object/public/"),
+               !trimmed.contains("/object/authenticated/") {
+                return URL(string: trimmed.replacingOccurrences(of: "/object/", with: "/object/public/"))
+            }
+            return url
         }
 
-        guard let fileURL = URL(string: sanitizedURL) else {
-            throw SupabaseError.networkError("Invalid download URL: \(sanitizedURL)")
+        return URL(string: "\(projectURL)/storage/v1/object/public/\(trimmed)")
+    }
+
+    func downloadFile(from url: String) async throws -> Data {
+        guard let fileURL = publicStorageURL(for: url) else {
+            throw SupabaseError.networkError("Invalid download URL: \(url)")
         }
 
         var request = URLRequest(url: fileURL)
@@ -393,7 +402,7 @@ final class SupabaseConfig: NetworkClient, @unchecked Sendable {
         let (data, httpResponse) = try await performRequestWithRetry(request, useStorageSession: true)
         
         guard (200...299).contains(httpResponse.statusCode) else {
-            throw SupabaseError.storageError("Download failed with status \(httpResponse.statusCode) for URL: \(sanitizedURL)")
+            throw SupabaseError.storageError("Download failed with status \(httpResponse.statusCode) for URL: \(fileURL.absoluteString)")
         }
 
         return data

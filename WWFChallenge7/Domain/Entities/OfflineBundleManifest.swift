@@ -151,7 +151,22 @@ struct BundleDownloadState: Codable, Equatable {
 
 struct BundleEnvelope {
     let manifest: OfflineBundleManifest
+    let bundleManifestSHA256: String?
+    let bundleSizeBytes: Int64?
+    let bundleAssetCount: Int?
+    let generatedAt: Date?
     let signedAssets: [String: String]
+
+    func replacingSignedAssets(_ signedAssets: [String: String]) -> BundleEnvelope {
+        BundleEnvelope(
+            manifest: manifest,
+            bundleManifestSHA256: bundleManifestSHA256,
+            bundleSizeBytes: bundleSizeBytes,
+            bundleAssetCount: bundleAssetCount,
+            generatedAt: generatedAt,
+            signedAssets: signedAssets
+        )
+    }
 }
 
 extension Dictionary where Key == String, Value == JSONValue {

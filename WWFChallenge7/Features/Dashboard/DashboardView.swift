@@ -8,55 +8,6 @@
 import SwiftUI
 import SwiftData
 
-// MARK: - Design System
-
-enum WWFDesign {
-    // Palette principale — bosco vulcanico
-    enum Colors {
-        // Verde foresta (hero, accenti primari)
-        static let forestDark     = Color(red: 0.102, green: 0.200, blue: 0.126) // #1a3320
-        static let forestMid      = Color(red: 0.176, green: 0.353, blue: 0.227) // #2d5a3a
-        static let forestLight    = Color(red: 0.388, green: 0.600, blue: 0.133) // #639922
-
-        // Accenti naturali
-        static let leafGreen      = Color(red: 0.478, green: 0.714, blue: 0.282) // #7ab648
-        static let leafLight      = Color(red: 0.659, green: 0.847, blue: 0.478) // #a8d87a
-
-        // Badge difficoltà
-        static let easyFill       = Color(red: 0.918, green: 0.953, blue: 0.871) // #eaf3de
-        static let easyText       = Color(red: 0.231, green: 0.427, blue: 0.067) // #3b6d11
-        static let mediumFill     = Color(red: 0.980, green: 0.933, blue: 0.851) // #faeeda
-        static let mediumText     = Color(red: 0.522, green: 0.310, blue: 0.043) // #854f0b
-        static let hardFill       = Color(red: 0.988, green: 0.922, blue: 0.922) // #fcebeb
-        static let hardText       = Color(red: 0.639, green: 0.176, blue: 0.176) // #a32d2d
-
-        // Warning
-        static let warningFill    = Color(red: 0.980, green: 0.933, blue: 0.851)
-        static let warningBorder  = Color(red: 0.980, green: 0.780, blue: 0.459)
-        static let warningText    = Color(red: 0.388, green: 0.220, blue: 0.024) // #633806
-        static let warningBody    = Color(red: 0.522, green: 0.310, blue: 0.043)
-    }
-
-    enum Typography {
-        static let heroTitle      = Font.custom("Georgia", size: 28, relativeTo: .title)
-        static let heroSubtitle   = Font.system(.footnote).weight(.light)
-        static let sectionTitle   = Font.custom("Georgia", size: 19, relativeTo: .headline)
-        static let trailName      = Font.system(.subheadline).weight(.medium)
-        static let trailDesc      = Font.system(.caption).weight(.light)
-        static let chipLabel      = Font.system(.caption).weight(.medium)
-        static let metaLabel      = Font.system(.caption2)
-        static let badge          = Font.system(.caption2).weight(.medium)
-    }
-
-    enum Radius {
-        static let card: CGFloat   = 16
-        static let hero: CGFloat   = 20
-        static let chip: CGFloat   = 20
-        static let badge: CGFloat  = 10
-        static let warning: CGFloat = 12
-    }
-}
-
 // MARK: - Main Dashboard
 
 struct DashboardView: View {
@@ -137,14 +88,14 @@ struct DashboardView: View {
 
                         // Title text
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Oasi degli Astroni")
+                            Text(localizer.localizedString(for: "app_title"))
                                 // CHANGED: .bold instead of .heavy — matches image 2 weight
-                                .font(.system(size: 28, weight: .bold, design: .rounded))
+                                .font(WWFDesign.Typography.titleHeroRounded)
                                 .foregroundColor(.white)
 
                             Text(localizer.localizedString(for: "explore"))
                                 // CHANGED: slightly lighter subtitle
-                                .font(.system(size: 16, weight: .regular, design: .rounded))
+                                .font(WWFDesign.Typography.bodyLargeRounded)
                                 .foregroundColor(.white.opacity(0.88))
                         }
                         .padding(.top, 58)
@@ -198,6 +149,16 @@ struct DashboardView: View {
                             visibleTrailId = displayedTrails.first?.id
                         }
                     }
+                    .onChange(of: displayedTrails.map(\.id)) { _, trailIds in
+                        guard !trailIds.isEmpty else {
+                            visibleTrailId = nil
+                            return
+                        }
+
+                        if visibleTrailId == nil || !trailIds.contains(visibleTrailId!) {
+                            visibleTrailId = trailIds.first
+                        }
+                    }
                 }
             }
             .fullScreenCover(item: $selectedTrail) { trail in
@@ -240,8 +201,8 @@ struct AstroniTrailCard: View {
     private var accentColor: Color {
         switch difficulty {
         case .easy:   return WWFDesign.Colors.forestLight
-        case .medium: return Color(red: 0.729, green: 0.459, blue: 0.043) // ambra
-        case .hard:   return Color(red: 0.886, green: 0.294, blue: 0.290) // rosso
+        case .medium: return WWFDesign.Colors.accentAmbra
+        case .hard:   return WWFDesign.Colors.accentRosso
         }
     }
 
@@ -273,7 +234,7 @@ struct AstroniTrailCard: View {
                 CardBlobShape()
                     .fill(WWFDesign.Colors.forestLight)
                 CardBlobShape()
-                    .stroke(Color.black, lineWidth: 2.5)
+                    .stroke(WWFDesign.Colors.organicOutline.opacity(0.38), lineWidth: 1.2)
             }
             .frame(width: 32)
             
@@ -281,11 +242,11 @@ struct AstroniTrailCard: View {
                 // Top row
                 VStack(alignment: .leading, spacing: 6) {
                     Text(trail.localizedName)
-                        .font(.system(size: 22, weight: .bold, design: .rounded))
+                        .font(WWFDesign.Typography.trailNameLarge)
                         .foregroundColor(.black)
                     
                     Text(trail.localizedDescription)
-                        .font(.system(size: 15, weight: .regular))
+                        .font(WWFDesign.Typography.trailDescBody)
                         .foregroundColor(.black.opacity(0.8))
                         // CHANGED: lineLimit increased to 3 — prevents mid-word truncation ("ci...")
                         // matching the full description visible in image 2
@@ -311,8 +272,8 @@ struct AstroniTrailCard: View {
                     // Durata
                     HStack(spacing: 4) {
                         Image(systemName: "clock")
-                            .font(.caption)
-                            .foregroundColor(Color(red: 0.522, green: 0.310, blue: 0.043))
+                            .font(WWFDesign.Typography.caption)
+                            .foregroundColor(WWFDesign.Colors.warningBody)
                         Text("\(trail.estimatedMinutes ?? 60) min")
                             .font(.system(size: 14, weight: .medium))
                             .foregroundColor(.black)
@@ -321,8 +282,8 @@ struct AstroniTrailCard: View {
                     // Tappe
                     HStack(spacing: 4) {
                         Image(systemName: "shoe.fill")
-                            .font(.caption)
-                            .foregroundColor(Color(red: 0.522, green: 0.310, blue: 0.043))
+                            .font(WWFDesign.Typography.caption)
+                            .foregroundColor(WWFDesign.Colors.warningBody)
                         Text("\(trail.steps.count) \(localizer.localizedString(for: "steps_label"))")
                             .font(.system(size: 14, weight: .medium))
                             .foregroundColor(.black)
@@ -333,9 +294,23 @@ struct AstroniTrailCard: View {
             .padding(.trailing, 20)
             .padding(.leading, 12)
         }
-        .background(Color.white)
-        .clipShape(RoundedRectangle(cornerRadius: 24))
-        .overlay(RoundedRectangle(cornerRadius: 24).stroke(Color.black, lineWidth: 2.5))
+        .background {
+            ZStack(alignment: .topTrailing) {
+                WWFDesign.Colors.cardCream
+                OrganicBlobShape(variant: 2)
+                    .fill(accentColor.opacity(0.10))
+                    .frame(width: 120, height: 90)
+                    .offset(x: 34, y: -22)
+                Image(systemName: "chevron.right.circle.fill")
+                    .font(.title3.weight(.semibold))
+                    .foregroundColor(accentColor.opacity(0.82))
+                    .padding(18)
+            }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 28, style: .continuous).stroke(WWFDesign.Colors.organicOutline.opacity(0.24), lineWidth: 1))
+        .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous).stroke(WWFDesign.Colors.organicInset.opacity(0.68), lineWidth: 1).padding(4))
+        .shadow(color: WWFDesign.Colors.forestDark.opacity(0.08), radius: 8, x: 0, y: 3)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(trail.localizedName). \(trail.localizedDescription). \(difficultyLabel). \(trail.estimatedMinutes ?? 60) minuti. \(trail.steps.count) tappe.")
         .accessibilityHint(interactive ? "Tocca due volte per aprire i dettagli del percorso" : "")

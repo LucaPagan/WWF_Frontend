@@ -35,7 +35,7 @@ struct EventListView: View {
                     .ignoresSafeArea(edges: .top)
                     
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Eventi")
+                        Text(LocalizationManager.shared.localizedString(for: "events"))
                             .font(.system(size: 28, weight: .bold, design: .rounded))
                             .foregroundColor(.white)
                         
@@ -105,7 +105,7 @@ struct EventListView: View {
                     
                 }
             }
-            .background(Color(.systemGroupedBackground).ignoresSafeArea())
+            .background(WWFDesign.Colors.backgroundCream.ignoresSafeArea())
             .toolbarBackground(.hidden, for: .navigationBar)
             .fullScreenCover(item: $selectedEvent) { event in
                 EventDetailView(event: event)

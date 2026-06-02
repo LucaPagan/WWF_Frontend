@@ -34,11 +34,24 @@ struct UserRemoteEntityFactory {
             numericCode: data["numeric_code"] as? String,
             descriptionKids: data["description_kids"] as? String,
             descriptionEasyRead: data["description_easy_read"] as? String,
+            arModelURL: data["ar_model_url"] as? String,
+            arAnimationConfig: Self.jsonString(from: data["ar_animation_config"]),
+            arModelTier: ContentTier(rawValue: data["ar_model_tier"] as? String ?? "") ?? .full,
             fixedID: id
         )
         poi.qrPayload = data["qr_payload"] as? String ?? "ASTRONI_POI_\(id.uuidString)"
         poi.needsSync = false
         return poi
+    }
+
+    nonisolated private static func jsonString(from value: Any?) -> String? {
+        if let string = value as? String { return string }
+        guard let value, JSONSerialization.isValidJSONObject(value),
+              let data = try? JSONSerialization.data(withJSONObject: value),
+              let string = String(data: data, encoding: .utf8) else {
+            return nil
+        }
+        return string
     }
 
     nonisolated func makeTrail(from data: [String: Any]) -> Trail? {

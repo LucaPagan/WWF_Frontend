@@ -67,7 +67,7 @@ struct EventDetailView: View {
                                 .frame(width: 44, height: 44)
                                 .contentShape(Circle())
                             }
-                            .accessibilityLabel("Torna indietro")
+                            .accessibilityLabel(localizer.localizedString(for: "back_button_accessibility"))
 
                             Spacer()
                         }
@@ -76,7 +76,7 @@ struct EventDetailView: View {
                         VStack(alignment: .leading, spacing: 8) {
                             Text(event.localizedName)
                                 .font(.system(size: 32, weight: .semibold, design: .rounded))
-                                .foregroundColor(Color(red: 0.941, green: 0.929, blue: 0.902))
+                                .foregroundColor(WWFDesign.Colors.backgroundOffWhite)
                                 .shadow(color: .black.opacity(0.2), radius: 4, x: 0, y: 2)
 
                             HStack(spacing: 12) {
@@ -170,7 +170,7 @@ struct EventDetailView: View {
                         }
                         .padding(16)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(Color(.systemBackground))
+                        .background(WWFDesign.Colors.cardCream)
                         .clipShape(RoundedRectangle(cornerRadius: WWFDesign.Radius.card))
                         .shadow(color: Color.black.opacity(0.03), radius: 4, x: 0, y: 2)
                         .padding(.horizontal, 16)
@@ -206,7 +206,7 @@ struct EventDetailView: View {
                             }
                             .padding(16)
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(Color(.systemBackground))
+                            .background(WWFDesign.Colors.cardCream)
                             .clipShape(RoundedRectangle(cornerRadius: WWFDesign.Radius.card))
                             .shadow(color: Color.black.opacity(0.03), radius: 4, x: 0, y: 2)
                             .padding(.horizontal, 16)
@@ -254,7 +254,7 @@ struct EventDetailView: View {
 
                         if event.completionQrPayload != nil || event.completionNumericCode != nil {
                             VStack(alignment: .leading, spacing: 12) {
-                                Text("Completamento evento")
+                                Text(localizer.localizedString(for: "event_completion"))
                                     .font(WWFDesign.Typography.sectionTitle)
                                     .foregroundColor(WWFDesign.Colors.forestDark)
 
@@ -263,7 +263,7 @@ struct EventDetailView: View {
                                         Button {
                                             showCompletionScanner = true
                                         } label: {
-                                            Label("Scansiona QR", systemImage: "qrcode.viewfinder")
+                                            Label(localizer.localizedString(for: "scan_qr_short"), systemImage: "qrcode.viewfinder")
                                                 .font(.headline)
                                                 .foregroundColor(.white)
                                                 .frame(maxWidth: .infinity)
@@ -277,7 +277,7 @@ struct EventDetailView: View {
                                         Button {
                                             showCompletionCodePrompt = true
                                         } label: {
-                                            Label("Codice", systemImage: "number")
+                                            Label(localizer.localizedString(for: "code_label"), systemImage: "number")
                                                 .font(.headline)
                                                 .foregroundColor(WWFDesign.Colors.forestMid)
                                                 .frame(maxWidth: .infinity)
@@ -289,7 +289,7 @@ struct EventDetailView: View {
                                 }
                             }
                             .padding(16)
-                            .background(Color(.systemBackground))
+                            .background(WWFDesign.Colors.cardCream)
                             .clipShape(RoundedRectangle(cornerRadius: WWFDesign.Radius.card))
                             .shadow(color: Color.black.opacity(0.03), radius: 4, x: 0, y: 2)
                             .padding(.horizontal, 16)
@@ -376,36 +376,36 @@ struct EventDetailView: View {
                         heroHeaderBackground
                             .frame(height: heroHeaderHeight)
                     }
-                    Color(.systemGroupedBackground)
+                    WWFDesign.Colors.backgroundCream
                 }
             }
             .ignoresSafeArea(edges: .top)
         }
-        .background(Color(.systemGroupedBackground))
+        .background(WWFDesign.Colors.backgroundCream)
         .toolbar(.hidden, for: .navigationBar)
         .toolbarBackground(.hidden, for: .navigationBar)
         .sheet(isPresented: $showCompletionScanner) {
             QRScannerView { payload in
                 showCompletionScanner = false
                 gamificationService.eventCompleted(event, validationMethod: "qr", payload: payload)
-                completionMessage = "Completamento registrato."
+                completionMessage = localizer.localizedString(for: "completion_registered")
                 showCompletionMessage = true
             }
             .ignoresSafeArea()
         }
-        .alert("Codice completamento", isPresented: $showCompletionCodePrompt) {
-            TextField("Codice", text: $completionCode)
-            Button("Conferma") {
+        .alert(localizer.localizedString(for: "completion_code_title"), isPresented: $showCompletionCodePrompt) {
+            TextField(localizer.localizedString(for: "code_label"), text: $completionCode)
+            Button(localizer.localizedString(for: "confirm_button")) {
                 gamificationService.eventCompleted(event, validationMethod: "numeric_code", payload: completionCode)
                 completionCode = ""
-                completionMessage = "Completamento registrato."
+                completionMessage = localizer.localizedString(for: "completion_registered")
                 showCompletionMessage = true
             }
             Button(localizer.localizedString(for: "cancel"), role: .cancel) {
                 completionCode = ""
             }
         }
-        .alert("Evento", isPresented: $showCompletionMessage) {
+        .alert(localizer.localizedString(for: "event_label"), isPresented: $showCompletionMessage) {
             Button(localizer.localizedString(for: "ok_button"), role: .cancel) {}
         } message: {
             Text(completionMessage ?? "")
@@ -478,7 +478,7 @@ struct TrailEventCard: View {
                 .lineLimit(2)
         }
         .padding()
-        .background(Color(.systemBackground))
+        .background(WWFDesign.Colors.cardCream)
         .clipShape(RoundedRectangle(cornerRadius: WWFDesign.Radius.card))
         .shadow(color: Color.black.opacity(0.03), radius: 4, x: 0, y: 2)
         .overlay(

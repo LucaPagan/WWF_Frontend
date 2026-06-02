@@ -25,6 +25,42 @@ enum MapDisplayMode: Equatable {
     case model3D(ThreeDMapType)
 }
 
+private struct ActiveTrailActionButtonStyle: ButtonStyle {
+    var fill: Color
+    var foreground: Color = .white
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .foregroundColor(foreground)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+            .background(fill)
+            .clipShape(Capsule())
+            .overlay(Capsule().stroke(WWFDesign.Colors.organicOutline.opacity(0.22), lineWidth: 1))
+            .shadow(color: WWFDesign.Colors.forestDark.opacity(configuration.isPressed ? 0.04 : 0.09), radius: configuration.isPressed ? 4 : 8, x: 0, y: configuration.isPressed ? 1 : 3)
+            .scaleEffect(configuration.isPressed ? 0.98 : 1)
+            .animation(.spring(response: 0.22, dampingFraction: 0.75), value: configuration.isPressed)
+    }
+}
+
+private struct ActiveTrailPillButtonStyle: ButtonStyle {
+    var fill: Color
+    var foreground: Color = .black
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .foregroundColor(foreground)
+            .padding(.horizontal, 14)
+            .frame(height: 44)
+            .background(fill)
+            .clipShape(Capsule())
+            .overlay(Capsule().stroke(WWFDesign.Colors.organicOutline.opacity(0.22), lineWidth: 1))
+            .shadow(color: WWFDesign.Colors.forestDark.opacity(configuration.isPressed ? 0.04 : 0.08), radius: configuration.isPressed ? 3 : 7, x: 0, y: configuration.isPressed ? 1 : 3)
+            .scaleEffect(configuration.isPressed ? 0.98 : 1)
+            .animation(.spring(response: 0.22, dampingFraction: 0.75), value: configuration.isPressed)
+    }
+}
+
 // MARK: - ActiveTrailView
 
 struct ActiveTrailView: View {
@@ -41,6 +77,8 @@ struct ActiveTrailView: View {
     @State private var completedPOIIds: Set<UUID> = []
     @State private var navigationState: TrailNavigationState = .atStart
     @State private var mapDisplayMode: MapDisplayMode = .flat2D
+    @State private var instructionPopup: InstructionPopupContent?
+    @ObservedObject private var voiceService = VoiceService.shared
 
     // Scanner / modals
     @State private var showScanner     = false
@@ -51,6 +89,7 @@ struct ActiveTrailView: View {
     @State private var showManualCode  = false
     @State private var progressRecord: LocalTrailProgress?
     @State private var globalAlerts: [POI] = []
+    @State private var showExitConfirmation = false
 
     // MARK: Computed helpers
 
@@ -95,16 +134,32 @@ struct ActiveTrailView: View {
         }
     }
 
+    private var navigationSpeechID: String {
+        switch navigationState {
+        case .atStart:
+            return "start-\(trail.id)"
+        case .navigatingTo(let step):
+            return "step-\(step.id)"
+        case .poiReached(let poi):
+            return "poi-\(poi.id)"
+        case .completed:
+            return "completed-\(trail.id)"
+        }
+    }
+
     // MARK: Body
 
     var body: some View {
         ZStack(alignment: .bottom) {
 
             // ── Map ──────────────────────────────────────────────────────────
+            WWFDesign.Colors.backgroundCream
+                .ignoresSafeArea()
+
             mapLayer
                 .ignoresSafeArea()
 
-            // ── Bottom navigation panel ───────────────────────────────────────
+            // ── Bottom navigation card ────────────────────────────────────────
             VStack(spacing: 0) {
                 ProgressView(value: progressFraction)
                     .tint(WWFDesign.Colors.forestLight)
@@ -116,38 +171,29 @@ struct ActiveTrailView: View {
                 }
                 .padding()
                 .background(
-                    Color(.systemBackground)
-                        .clipShape(RoundedRectangle(cornerRadius: 24))
-                        .shadow(color: .black.opacity(0.12), radius: 12, x: 0, y: -4)
+                    WWFDesign.Colors.cardCream
+                        .clipShape(RoundedRectangle(cornerRadius: 30, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 30, style: .continuous)
+                                .stroke(WWFDesign.Colors.organicOutline.opacity(0.22), lineWidth: 1)
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 26, style: .continuous)
+                                .stroke(WWFDesign.Colors.organicInset.opacity(0.64), lineWidth: 1)
+                                .padding(4)
+                        )
+                        .shadow(color: WWFDesign.Colors.forestDark.opacity(0.08), radius: 10, x: 0, y: -3)
                 )
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.horizontal)
-                .padding(.bottom, 20)
+                .padding(.bottom, 4)
             }
+            .ignoresSafeArea(edges: .bottom)
         }
         // ── Top-leading controls ──────────────────────────────────────────────
         .overlay(alignment: .topLeading) {
-            VStack(spacing: 16) {
-                Button { dismiss() } label: {
-                    ZStack {
-                        Circle()
-                            .fill(WWFDesign.Colors.forestMid.opacity(0.35))
-                            .background(.ultraThinMaterial)
-                            .overlay(
-                                Circle().stroke(WWFDesign.Colors.leafGreen.opacity(0.35), lineWidth: 0.5)
-                            )
-                            .clipShape(Circle())
-
-                        Image(systemName: "xmark")
-                            .font(.headline)
-                            .foregroundColor(WWFDesign.Colors.leafLight)
-                    }
-                    .frame(width: 44, height: 44)
-                    .contentShape(Circle())
-                }
-                .accessibilityLabel("Chiudi percorso")
-                .padding(.top, 8)
-
+            VStack(alignment: .leading, spacing: 12) {
+                exitTrailButton
                 mapSwitcherMenu
             }
             .padding(.horizontal)
@@ -155,13 +201,14 @@ struct ActiveTrailView: View {
         // ── Progress label ───────────────────────────────────────────────────
         .overlay(alignment: .topTrailing) {
             Text("\(completedPOIIds.count)/\(trail.steps.count)")
-                .font(.caption)
-                .fontWeight(.bold)
-                .foregroundColor(.white)
+                .font(WWFDesign.Typography.caption.weight(.bold))
+                .foregroundColor(WWFDesign.Colors.forestDark)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 5)
-                .background(Color.black.opacity(0.4))
+                .background(WWFDesign.Colors.cardCream.opacity(0.92))
                 .clipShape(Capsule())
+                .overlay(Capsule().stroke(WWFDesign.Colors.organicOutline.opacity(0.22), lineWidth: 1))
+                .shadow(color: WWFDesign.Colors.forestDark.opacity(0.06), radius: 6, x: 0, y: 2)
                 .padding(.top, 8)
                 .padding(.trailing, 16)
                 .accessibilityLabel("Progresso: \(completedPOIIds.count) su \(trail.steps.count) tappe completate")
@@ -176,12 +223,14 @@ struct ActiveTrailView: View {
                     showManualCode = true
                 } label: {
                     Text(localizer.localizedString(for: "manual_code_entry"))
-                        .font(.headline)
+                        .font(WWFDesign.Typography.headline)
                         .padding()
                         .frame(maxWidth: .infinity)
-                        .background(Color.black.opacity(0.7))
+                        .background(WWFDesign.Colors.forestMid)
                         .foregroundColor(.white)
-                        .cornerRadius(12)
+                        .clipShape(Capsule())
+                        .overlay(Capsule().stroke(WWFDesign.Colors.organicOutline.opacity(0.20), lineWidth: 1))
+                        .shadow(color: WWFDesign.Colors.forestDark.opacity(0.10), radius: 8, x: 0, y: 3)
                         .padding()
                         .padding(.bottom, 20)
                 }
@@ -199,9 +248,8 @@ struct ActiveTrailView: View {
                         markVisited(matched, source: .numericCode, qrPayload: matched.qrPayload)
                     case .globalAlert(let alert):
                         scannedPOI = alert
-                    case .alreadyVisited:
-                        qrErrorMessage = localizer.localizedString(for: "poi_already_visited")
-                        showQRErrorAlert = true
+                    case .alreadyVisited(let visited):
+                        openVisitedPOI(visited)
                     case .notInDownloadedTrail, .unknown:
                         qrErrorMessage = localizer.localizedString(for: "qr_not_related")
                         showQRErrorAlert = true
@@ -221,14 +269,35 @@ struct ActiveTrailView: View {
                 POIModalView(poi: poi, onContinue: { showPOIModal = false })
             }
         }
+        .sheet(item: $instructionPopup) { content in
+            InstructionTextPopup(content: content)
+        }
         .alert(localizer.localizedString(for: "qr_error"), isPresented: $showQRErrorAlert) {
             Button(localizer.localizedString(for: "ok_button"), role: .cancel) {}
         } message: {
             Text(qrErrorMessage)
         }
+        .alert(localizer.localizedString(for: "exit_trail_title"), isPresented: $showExitConfirmation) {
+            Button(localizer.localizedString(for: "cancel"), role: .cancel) {}
+            Button(localizer.localizedString(for: "exit_and_reset"), role: .destructive) {
+                resetProgressAndExit()
+            }
+        } message: {
+            Text(localizer.localizedString(for: "exit_trail_message"))
+        }
         .onAppear {
+            gamificationService.isNavigatingTrail = true
             loadGlobalAlerts()
             loadProgress()
+        }
+        .onDisappear {
+            VoiceService.shared.stop()
+            gamificationService.isNavigatingTrail = false
+            gamificationService.flushDeferredRewards()
+        }
+        .onChange(of: navigationSpeechID) {
+            VoiceService.shared.stop()
+            instructionPopup = nil
         }
     }
 
@@ -246,7 +315,8 @@ struct ActiveTrailView: View {
                     completedPOIIds: completedPOIIds,
                     currentStepPOIId: currentStep?.poi?.id,
                     currentNormalizedPosition: currentNormalizedPosition,
-                    navigationState: navigationState
+                    navigationState: navigationState,
+                    onCompletedPOITap: openVisitedPOI
                 )
             case .model3D(let mapType):
                 Visitor3DMapView(
@@ -255,13 +325,27 @@ struct ActiveTrailView: View {
                     currentStepPOIId: currentStep?.poi?.id,
                     currentNormalizedPosition: currentNormalizedPosition,
                     navigationState: navigationState,
-                    mapType: mapType
+                    mapType: mapType,
+                    onCompletedPOITap: openVisitedPOI
                 )
             }
         }
     }
 
     // MARK: Map switcher menu
+
+    private var exitTrailButton: some View {
+        Button {
+            showExitConfirmation = true
+        } label: {
+            Label(localizer.localizedString(for: "exit_trail"), systemImage: "rectangle.portrait.and.arrow.right")
+                .font(WWFDesign.Typography.chipLabel.weight(.bold))
+        }
+        .buttonStyle(ActiveTrailPillButtonStyle(fill: WWFDesign.Colors.cardCream))
+        .accessibilityLabel(localizer.localizedString(for: "exit_trail"))
+        .accessibilityHint(localizer.localizedString(for: "exit_trail_accessibility_hint"))
+        .padding(.top, 8)
+    }
 
     private var mapSwitcherMenu: some View {
         Menu {
@@ -282,30 +366,27 @@ struct ActiveTrailView: View {
                 }
             }
         } label: {
-            ZStack {
-                Circle()
-                    .fill(WWFDesign.Colors.forestMid.opacity(0.35))
-                    .background(.ultraThinMaterial)
-                    .overlay(
-                        Circle().stroke(WWFDesign.Colors.leafGreen.opacity(0.35), lineWidth: 0.5)
-                    )
-                    .clipShape(Circle())
-
-                Image(systemName: mapIconName)
-                    .font(.headline)
-                    .foregroundColor(WWFDesign.Colors.leafLight)
-            }
-            .frame(width: 44, height: 44)
-            .contentShape(Circle())
+            Label(currentMapLabel, systemImage: mapIconName)
+                .font(WWFDesign.Typography.chipLabel.weight(.bold))
         }
-        .accessibilityLabel("Cambia tipo mappa")
-        .accessibilityHint("Seleziona mappa 2D o 3D")
+        .buttonStyle(ActiveTrailPillButtonStyle(fill: WWFDesign.Colors.leafLight))
+        .accessibilityLabel(localizer.localizedString(for: "change_map_type"))
+        .accessibilityHint(localizer.localizedString(for: "change_map_type_hint"))
     }
 
     private var mapIconName: String {
         switch mapDisplayMode {
         case .flat2D:          return "view.3d"
         case .model3D(let t):  return t == .realistic ? "arkit" : "map"
+        }
+    }
+
+    private var currentMapLabel: String {
+        switch mapDisplayMode {
+        case .flat2D:
+            return localizer.localizedString(for: "flat_2d_map")
+        case .model3D(let type):
+            return localizer.localizedString(for: type == .realistic ? "map_type_realistic" : "map_type_basic")
         }
     }
 
@@ -318,10 +399,26 @@ struct ActiveTrailView: View {
             StartPointCard(
                 name: trail.startPointName,
                 description: trail.startPointDescription,
-                nextStepInstructions: trail.sortedSteps.first?.instructions
+                nextStepInstructions: trail.sortedSteps.first?.instructions,
+                showsFullTextAction: shouldShowStartPopup,
+                isSpeaking: voiceService.isSpeaking,
+                onShowFullText: showStartInstructions,
+                onToggleAudio: {
+                    toggleSpeech(text: startSpeechText)
+                }
             )
         case .navigatingTo(let step):
-            NavigatingCard(step: step)
+            NavigatingCard(
+                step: step,
+                showsFullTextAction: isLongInstruction(step.instructions),
+                isSpeaking: voiceService.isSpeaking,
+                onShowFullText: {
+                    showStepInstructions(step)
+                },
+                onToggleAudio: {
+                    toggleSpeech(text: step.instructions)
+                }
+            )
         case .poiReached(let poi):
             POIReachedCard(poi: poi)
         case .completed:
@@ -336,34 +433,27 @@ struct ActiveTrailView: View {
         switch navigationState {
         case .atStart:
             Button {
+                VoiceService.shared.stop()
                 if let first = trail.sortedSteps.first {
                     navigationState = .navigatingTo(first)
                     gamificationService.trailStarted(trail)
                 }
             } label: {
                 Label(LocalizationManager.shared.localizedString(for: "start_trail"), systemImage: "figure.hiking")
-                    .font(.headline)
-                    .foregroundColor(.white)
+                    .font(WWFDesign.Typography.headline)
                     .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(WWFDesign.Colors.forestLight)
-                    .clipShape(RoundedRectangle(cornerRadius: WWFDesign.Radius.card))
-                    .shadow(color: WWFDesign.Colors.forestMid.opacity(0.2), radius: 6, x: 0, y: 3)
             }
+            .buttonStyle(ActiveTrailActionButtonStyle(fill: WWFDesign.Colors.forestLight))
             .accessibilityLabel("Inizia percorso")
             .accessibilityHint("Avvia la navigazione del sentiero")
 
         case .navigatingTo:
             Button { showScanner = true } label: {
                 Label(LocalizationManager.shared.localizedString(for: "scan_qr"), systemImage: "qrcode.viewfinder")
-                    .font(.headline)
-                    .foregroundColor(.white)
+                    .font(WWFDesign.Typography.headline)
                     .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(WWFDesign.Colors.forestMid)
-                    .clipShape(RoundedRectangle(cornerRadius: WWFDesign.Radius.card))
-                    .shadow(color: WWFDesign.Colors.forestMid.opacity(0.2), radius: 6, x: 0, y: 3)
             }
+            .buttonStyle(ActiveTrailActionButtonStyle(fill: WWFDesign.Colors.forestMid))
             .accessibilityLabel("Scansiona QR code")
             .accessibilityHint("Apri la fotocamera per scansionare il QR code del punto di interesse")
 
@@ -371,16 +461,12 @@ struct ActiveTrailView: View {
             EmptyView()
 
         case .completed:
-            Button { dismiss() } label: {
-                Label(LocalizationManager.shared.localizedString(for: "back_to_home"), systemImage: "house.fill")
-                    .font(.headline)
-                    .foregroundColor(.white)
+            Button { restartTrail() } label: {
+                Label(LocalizationManager.shared.localizedString(for: "restart_trail"), systemImage: "arrow.counterclockwise")
+                    .font(WWFDesign.Typography.headline)
                     .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(WWFDesign.Colors.forestDark)
-                    .clipShape(RoundedRectangle(cornerRadius: WWFDesign.Radius.card))
-                    .shadow(color: WWFDesign.Colors.forestDark.opacity(0.25), radius: 6, x: 0, y: 3)
             }
+            .buttonStyle(ActiveTrailActionButtonStyle(fill: WWFDesign.Colors.leafLight, foreground: .black))
         }
     }
 
@@ -404,8 +490,8 @@ struct ActiveTrailView: View {
             markVisited(matched, source: .qr, qrPayload: clean)
         case .globalAlert(let alert):
             scannedPOI = alert
-        case .alreadyVisited:
-            qrErrorMessage = localizer.localizedString(for: "poi_already_visited")
+        case .alreadyVisited(let visited):
+            openVisitedPOI(visited)
         case .notInDownloadedTrail, .unknown:
             qrErrorMessage = "\(localizer.localizedString(for: "qr_not_related"))\n\n\(localizer.localizedString(for: "scanned")):\n\(clean)"
         }
@@ -414,12 +500,21 @@ struct ActiveTrailView: View {
     // MARK: Modal dismiss
 
     private func handleModalDismiss() {
+        VoiceService.shared.stop()
         if isCompleted {
             navigationState = .completed
             completeProgressIfNeeded()
         } else if let next = currentStep {
             navigationState = .navigatingTo(next)
         }
+    }
+
+    private func openVisitedPOI(_ poi: POI) {
+        VoiceService.shared.stop()
+        scannedPOI = poi
+        showScanner = false
+        showManualCode = false
+        showPOIModal = true
     }
 
     private func loadGlobalAlerts() {
@@ -455,6 +550,7 @@ struct ActiveTrailView: View {
     }
 
     private func markVisited(_ poi: POI, source: LocalVisitSource, qrPayload: String?) {
+        VoiceService.shared.stop()
         guard !completedPOIIds.contains(poi.id) else {
             qrErrorMessage = localizer.localizedString(for: "poi_already_visited")
             showQRErrorAlert = true
@@ -503,6 +599,99 @@ struct ActiveTrailView: View {
         gamificationService.trailCompleted(trail, progress: progressRecord)
         Task { await syncManager.pushPendingProgress(deviceId: userSession.deviceId) }
     }
+
+    private func resetProgressAndExit() {
+        resetLocalProgress()
+        dismiss()
+    }
+
+    private func restartTrail() {
+        resetLocalProgress()
+        gamificationService.trailStarted(trail)
+    }
+
+    private func resetLocalProgress() {
+        VoiceService.shared.stop()
+        let pathId = trail.id
+        let descriptor = FetchDescriptor<LocalTrailProgress>(
+            predicate: #Predicate { $0.pathId == pathId }
+        )
+        let records = (try? modelContext.fetch(descriptor)) ?? []
+        for record in records {
+            modelContext.delete(record)
+        }
+
+        let progress = LocalTrailProgress(pathId: trail.id)
+        modelContext.insert(progress)
+        try? modelContext.save()
+
+        progressRecord = progress
+        completedPOIIds = []
+        scannedPOI = nil
+        qrErrorMessage = ""
+        navigationState = .atStart
+    }
+
+    private var startSpeechText: String {
+        [
+            trail.startPointName,
+            trail.startPointDescription,
+            trail.sortedSteps.first?.instructions
+        ]
+            .compactMap { $0 }
+            .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+            .joined(separator: ". ")
+    }
+
+    private var startPopupText: String {
+        [
+            trail.startPointDescription,
+            trail.sortedSteps.first?.instructions
+        ]
+            .compactMap { $0 }
+            .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+            .joined(separator: "\n\n")
+    }
+
+    private var shouldShowStartPopup: Bool {
+        isLongInstruction(trail.startPointDescription) ||
+        isLongInstruction(trail.sortedSteps.first?.instructions ?? "")
+    }
+
+    private func toggleSpeech(text: String) {
+        if voiceService.isSpeaking {
+            voiceService.stop()
+        } else {
+            voiceService.speak(text, languageCode: localizer.preferredLanguage)
+        }
+    }
+
+    private func showStartInstructions() {
+        guard shouldShowStartPopup else { return }
+        instructionPopup = InstructionPopupContent(
+            title: trail.startPointName,
+            subtitle: localizer.localizedString(for: "you_are_here"),
+            body: startPopupText,
+            metadata: nil,
+            tint: WWFDesign.Colors.forestLight
+        )
+    }
+
+    private func showStepInstructions(_ step: TrailStep) {
+        guard isLongInstruction(step.instructions) else { return }
+        instructionPopup = InstructionPopupContent(
+            title: step.poi?.localizedName ?? localizer.localizedString(for: "go_to"),
+            subtitle: localizer.localizedString(for: "go_to"),
+            body: step.instructions,
+            metadata: "\(step.distanceMeters) m - ~\(step.estimatedMinutes) min",
+            tint: WWFDesign.Colors.accentAmbra
+        )
+    }
+
+    private func isLongInstruction(_ text: String) -> Bool {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.count > 130 || trimmed.contains("\n")
+    }
 }
 
 // MARK: - StartPointCard
@@ -511,6 +700,10 @@ private struct StartPointCard: View {
     let name: String
     let description: String
     let nextStepInstructions: String?
+    let showsFullTextAction: Bool
+    let isSpeaking: Bool
+    let onShowFullText: () -> Void
+    let onToggleAudio: () -> Void
     @ObservedObject private var localizer = LocalizationManager.shared
 
     var body: some View {
@@ -519,22 +712,40 @@ private struct StartPointCard: View {
                 CardBlobShape()
                     .fill(WWFDesign.Colors.forestLight)
                 CardBlobShape()
-                    .stroke(Color.black, lineWidth: 2.5)
+                    .stroke(WWFDesign.Colors.organicOutline.opacity(0.38), lineWidth: 1.2)
             }
             .frame(width: 32)
 
             VStack(alignment: .leading, spacing: 12) {
                 VStack(alignment: .leading, spacing: 6) {
-                    HStack(spacing: 6) {
+                    HStack(alignment: .top, spacing: 8) {
                         Image(systemName: "flag.fill")
-                            .font(.caption)
+                            .font(WWFDesign.Typography.caption)
                             .foregroundColor(WWFDesign.Colors.forestLight)
+                            .padding(.top, 7)
                         Text("\(localizer.localizedString(for: "you_are_here")): \(name)")
-                            .font(.system(size: 22, weight: .bold, design: .rounded))
+                            .font(WWFDesign.Typography.trailNameLarge)
                             .foregroundColor(.black)
+                            .lineLimit(3)
+                            .fixedSize(horizontal: false, vertical: true)
+
+                        Spacer(minLength: 8)
+
+                        if showsFullTextAction {
+                            Image(systemName: "arrow.up.left.and.arrow.down.right")
+                                .font(.caption.weight(.bold))
+                                .foregroundColor(WWFDesign.Colors.forestMid)
+                                .accessibilityHidden(true)
+                        }
+
+                        SpeechToggleButton(
+                            isSpeaking: isSpeaking,
+                            tint: WWFDesign.Colors.forestLight,
+                            action: onToggleAudio
+                        )
                     }
                     Text(description)
-                        .font(.system(size: 15, weight: .regular))
+                        .font(WWFDesign.Typography.trailDescBody)
                         .foregroundColor(.black.opacity(0.8))
                         .lineLimit(3)
                         .fixedSize(horizontal: false, vertical: true)
@@ -543,8 +754,8 @@ private struct StartPointCard: View {
                 if let instructions = nextStepInstructions {
                     HStack(alignment: .top, spacing: 8) {
                         Image(systemName: "arrow.turn.up.right")
-                            .font(.caption)
-                            .foregroundColor(Color(red: 0.522, green: 0.310, blue: 0.043))
+                            .font(WWFDesign.Typography.caption)
+                            .foregroundColor(WWFDesign.Colors.warningBody)
                             .padding(.top, 2)
                         Text(instructions)
                             .font(.system(size: 14, weight: .medium))
@@ -558,9 +769,17 @@ private struct StartPointCard: View {
             .padding(.trailing, 20)
             .padding(.leading, 12)
         }
-        .background(Color.white)
-        .clipShape(RoundedRectangle(cornerRadius: 24))
-        .overlay(RoundedRectangle(cornerRadius: 24).stroke(Color.black, lineWidth: 2.5))
+        .background(WWFDesign.Colors.cardCream)
+        .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 26, style: .continuous).stroke(WWFDesign.Colors.organicOutline.opacity(0.24), lineWidth: 1))
+        .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).stroke(WWFDesign.Colors.organicInset.opacity(0.66), lineWidth: 1).padding(4))
+        .shadow(color: WWFDesign.Colors.forestDark.opacity(0.07), radius: 7, x: 0, y: 3)
+        .contentShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
+        .onTapGesture {
+            if showsFullTextAction {
+                onShowFullText()
+            }
+        }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Punto di partenza: \(name). \(description). \(nextStepInstructions ?? "")")
     }
@@ -570,6 +789,10 @@ private struct StartPointCard: View {
 
 private struct NavigatingCard: View {
     let step: TrailStep
+    let showsFullTextAction: Bool
+    let isSpeaking: Bool
+    let onShowFullText: () -> Void
+    let onToggleAudio: () -> Void
     @ObservedObject private var localizer = LocalizationManager.shared
 
     var body: some View {
@@ -578,33 +801,50 @@ private struct NavigatingCard: View {
                 CardBlobShape()
                     .fill(Color.orange)
                 CardBlobShape()
-                    .stroke(Color.black, lineWidth: 2.5)
+                    .stroke(WWFDesign.Colors.organicOutline.opacity(0.38), lineWidth: 1.2)
             }
             .frame(width: 32)
 
             VStack(alignment: .leading, spacing: 12) {
                 VStack(alignment: .leading, spacing: 6) {
-                    HStack(spacing: 6) {
+                    HStack(alignment: .top, spacing: 8) {
                         Image(systemName: "arrow.triangle.turn.up.right.circle.fill")
-                            .font(.caption)
+                            .font(WWFDesign.Typography.caption)
                             .foregroundColor(.orange)
+                            .padding(.top, 7)
                         if let poi = step.poi {
                             Text("\(localizer.localizedString(for: "go_to")): \(poi.localizedName)")
-                                .font(.system(size: 22, weight: .bold, design: .rounded))
+                                .font(WWFDesign.Typography.trailNameLarge)
                                 .foregroundColor(.black)
+                                .lineLimit(3)
+                                .fixedSize(horizontal: false, vertical: true)
                         }
+
+                        Spacer(minLength: 8)
+
+                        if showsFullTextAction {
+                            Image(systemName: "arrow.up.left.and.arrow.down.right")
+                                .font(.caption.weight(.bold))
+                                .foregroundColor(WWFDesign.Colors.warningBody)
+                                .accessibilityHidden(true)
+                        }
+
+                        SpeechToggleButton(
+                            isSpeaking: isSpeaking,
+                            tint: WWFDesign.Colors.accentAmbra,
+                            action: onToggleAudio
+                        )
                     }
                     Text(localizer.localizedString(for: "scan_qr_desc"))
-                        .font(.system(size: 15, weight: .regular))
+                        .font(WWFDesign.Typography.trailDescBody)
                         .foregroundColor(.black.opacity(0.8))
-                        .lineLimit(2)
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
                 HStack(alignment: .top, spacing: 8) {
                     Image(systemName: "arrow.turn.up.right")
-                        .font(.caption)
-                        .foregroundColor(Color(red: 0.522, green: 0.310, blue: 0.043))
+                        .font(WWFDesign.Typography.caption)
+                        .foregroundColor(WWFDesign.Colors.warningBody)
                         .padding(.top, 2)
                     Text(step.instructions)
                         .font(.system(size: 14, weight: .medium))
@@ -616,16 +856,16 @@ private struct NavigatingCard: View {
                 HStack(spacing: 16) {
                     HStack(spacing: 4) {
                         Image(systemName: "ruler")
-                            .font(.caption)
-                            .foregroundColor(Color(red: 0.522, green: 0.310, blue: 0.043))
+                            .font(WWFDesign.Typography.caption)
+                            .foregroundColor(WWFDesign.Colors.warningBody)
                         Text("\(step.distanceMeters) m")
                             .font(.system(size: 14, weight: .medium))
                             .foregroundColor(.black)
                     }
                     HStack(spacing: 4) {
                         Image(systemName: "clock")
-                            .font(.caption)
-                            .foregroundColor(Color(red: 0.522, green: 0.310, blue: 0.043))
+                            .font(WWFDesign.Typography.caption)
+                            .foregroundColor(WWFDesign.Colors.warningBody)
                         Text("~\(step.estimatedMinutes) min")
                             .font(.system(size: 14, weight: .medium))
                             .foregroundColor(.black)
@@ -636,11 +876,125 @@ private struct NavigatingCard: View {
             .padding(.trailing, 20)
             .padding(.leading, 12)
         }
-        .background(Color.white)
-        .clipShape(RoundedRectangle(cornerRadius: 24))
-        .overlay(RoundedRectangle(cornerRadius: 24).stroke(Color.black, lineWidth: 2.5))
+        .background(WWFDesign.Colors.cardCream)
+        .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 26, style: .continuous).stroke(WWFDesign.Colors.organicOutline.opacity(0.24), lineWidth: 1))
+        .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).stroke(WWFDesign.Colors.organicInset.opacity(0.66), lineWidth: 1).padding(4))
+        .shadow(color: WWFDesign.Colors.forestDark.opacity(0.07), radius: 7, x: 0, y: 3)
+        .contentShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
+        .onTapGesture {
+            if showsFullTextAction {
+                onShowFullText()
+            }
+        }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Prossima tappa: \(step.poi?.localizedName ?? ""). \(step.instructions). Distanza: \(step.distanceMeters) metri, circa \(step.estimatedMinutes) minuti.")
+    }
+}
+
+// MARK: - Shared Card Pieces
+
+private struct SpeechToggleButton: View {
+    let isSpeaking: Bool
+    let tint: Color
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: isSpeaking ? "stop.fill" : "speaker.wave.2.fill")
+                .font(.system(size: 16, weight: .bold))
+                .foregroundColor(isSpeaking ? .white : tint)
+                .frame(width: 38, height: 38)
+                .background(isSpeaking ? tint : tint.opacity(0.13))
+                .clipShape(Circle())
+                .overlay(Circle().stroke(WWFDesign.Colors.organicOutline.opacity(0.32), lineWidth: 1.1))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(isSpeaking ? "Interrompi sintesi vocale" : "Leggi istruzioni ad alta voce")
+    }
+}
+
+private struct InstructionPopupContent: Identifiable {
+    let id = UUID()
+    let title: String
+    let subtitle: String?
+    let body: String
+    let metadata: String?
+    let tint: Color
+}
+
+private struct InstructionTextPopup: View {
+    let content: InstructionPopupContent
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Capsule()
+                .fill(WWFDesign.Colors.organicOutline.opacity(0.5))
+                .frame(width: 44, height: 5)
+                .padding(.top, 12)
+                .padding(.bottom, 18)
+                .accessibilityHidden(true)
+
+            HStack(alignment: .top, spacing: 12) {
+                VStack(alignment: .leading, spacing: 6) {
+                    if let subtitle = content.subtitle {
+                        Text(subtitle)
+                            .font(WWFDesign.Typography.chipLabel.weight(.bold))
+                            .foregroundColor(content.tint)
+                    }
+
+                    Text(content.title)
+                        .font(WWFDesign.Typography.trailNameLarge)
+                        .foregroundColor(.black)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    if let metadata = content.metadata {
+                        Text(metadata)
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(.black.opacity(0.65))
+                    }
+                }
+
+                Spacer(minLength: 12)
+
+                Button {
+                    dismiss()
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundColor(.black)
+                        .frame(width: 36, height: 36)
+                        .background(Color.white)
+                        .clipShape(Circle())
+                        .overlay(Circle().stroke(WWFDesign.Colors.organicOutline.opacity(0.30), lineWidth: 1.1))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Chiudi")
+            }
+            .padding(.horizontal, 22)
+            .padding(.bottom, 16)
+
+            ScrollView {
+                Text(content.body)
+                    .font(WWFDesign.Typography.trailDescBody)
+                    .foregroundColor(.black.opacity(0.86))
+                    .lineSpacing(5)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(18)
+                    .background(WWFDesign.Colors.cardCream)
+                    .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .stroke(WWFDesign.Colors.organicOutline.opacity(0.24), lineWidth: 1)
+                    )
+                    .padding(.horizontal, 22)
+                    .padding(.bottom, 24)
+            }
+        }
+        .background(WWFDesign.Colors.cardCream.opacity(0.98))
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.hidden)
     }
 }
 
@@ -656,21 +1010,21 @@ private struct POIReachedCard: View {
                 CardBlobShape()
                     .fill(WWFDesign.Colors.leafGreen)
                 CardBlobShape()
-                    .stroke(Color.black, lineWidth: 2.5)
+                    .stroke(WWFDesign.Colors.organicOutline.opacity(0.38), lineWidth: 1.2)
             }
             .frame(width: 32)
 
             VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 6) {
                     Image(systemName: "checkmark.seal.fill")
-                        .font(.caption)
+                        .font(WWFDesign.Typography.caption)
                         .foregroundColor(WWFDesign.Colors.leafGreen)
                     Text("\(localizer.localizedString(for: "reached")): \(poi.localizedName)")
-                        .font(.system(size: 22, weight: .bold, design: .rounded))
+                        .font(WWFDesign.Typography.trailNameLarge)
                         .foregroundColor(.black)
                 }
                 Text(localizer.localizedString(for: "view_info"))
-                    .font(.system(size: 15, weight: .regular))
+                    .font(WWFDesign.Typography.trailDescBody)
                     .foregroundColor(.black.opacity(0.8))
             }
             .padding(.vertical, 20)
@@ -679,9 +1033,11 @@ private struct POIReachedCard: View {
 
             Spacer()
         }
-        .background(Color.white)
-        .clipShape(RoundedRectangle(cornerRadius: 24))
-        .overlay(RoundedRectangle(cornerRadius: 24).stroke(Color.black, lineWidth: 2.5))
+        .background(WWFDesign.Colors.cardCream)
+        .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 26, style: .continuous).stroke(WWFDesign.Colors.organicOutline.opacity(0.24), lineWidth: 1))
+        .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).stroke(WWFDesign.Colors.organicInset.opacity(0.66), lineWidth: 1).padding(4))
+        .shadow(color: WWFDesign.Colors.forestDark.opacity(0.07), radius: 7, x: 0, y: 3)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Raggiunto: \(poi.localizedName). Tocca per visualizzare le informazioni.")
     }

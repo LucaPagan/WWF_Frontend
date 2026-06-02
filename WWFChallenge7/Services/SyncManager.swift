@@ -377,25 +377,25 @@ actor UserSyncWorker: ModelActor {
 
             remoteIds.insert(remoteId)
 
-            // Find existing step
+            let trailDescriptor = FetchDescriptor<Trail>(predicate: #Predicate { $0.id == pathId })
+            let poiDescriptor = FetchDescriptor<POI>(predicate: #Predicate { $0.id == poiId })
+            guard let trail = try modelContext.fetch(trailDescriptor).first,
+                  let poi = try modelContext.fetch(poiDescriptor).first else { continue }
+
             let stepDescriptor = FetchDescriptor<TrailStep>(predicate: #Predicate { $0.id == remoteId })
             if let existingStep = try modelContext.fetch(stepDescriptor).first {
-                // Update mutable fields instead of skipping
                 existingStep.stepOrder = data["step_order"] as? Int ?? existingStep.stepOrder
                 existingStep.directionHint = data["direction_hint"] as? String ?? existingStep.directionHint
                 existingStep.distanceMeters = data["distance_meters"] as? Int ?? existingStep.distanceMeters
                 existingStep.estimatedMinutes = data["estimated_minutes"] as? Int ?? existingStep.estimatedMinutes
                 existingStep.pathGeometry = data["path_geometry"] as? String
+                existingStep.poi = poi
+                if !trail.steps.contains(where: { $0.id == existingStep.id }) {
+                    trail.steps.append(existingStep)
+                }
                 count += 1
                 continue
             }
-
-            // Find parent trail and POI
-            let trailDescriptor = FetchDescriptor<Trail>(predicate: #Predicate { $0.id == pathId })
-            let poiDescriptor = FetchDescriptor<POI>(predicate: #Predicate { $0.id == poiId })
-
-            guard let trail = try modelContext.fetch(trailDescriptor).first,
-                  let poi = try modelContext.fetch(poiDescriptor).first else { continue }
 
             let step = TrailStep(
                 stepOrder: data["step_order"] as? Int ?? 0,
@@ -411,6 +411,7 @@ actor UserSyncWorker: ModelActor {
             count += 1
         }
 
+        try pruneStaleRecords(of: TrailStep.self, remoteIds: remoteIds)
         return count
     }
 
@@ -457,6 +458,7 @@ actor UserSyncWorker: ModelActor {
 
             if let existing = try modelContext.fetch(descriptor).first {
                 existing.updateFromRemote(data)
+                try updateEventRelationships(existing, from: data)
             } else if let newEvent = remoteFactory.makeEvent(from: data) {
                 modelContext.insert(newEvent)
             }
@@ -467,6 +469,30 @@ actor UserSyncWorker: ModelActor {
         try pruneStaleRecords(of: Event.self, remoteIds: remoteIds)
 
         return count
+    }
+
+    private func updateEventRelationships(_ event: Event, from data: [String: Any]) throws {
+        event.trail = try fetchTrail(id: Self.uuidValue(data["path_id"]))
+        event.eventPOI = try fetchPOI(id: Self.uuidValue(data["event_poi_id"]))
+    }
+
+    private func fetchTrail(id: UUID?) throws -> Trail? {
+        guard let id else { return nil }
+        let descriptor = FetchDescriptor<Trail>(predicate: #Predicate { $0.id == id })
+        return try modelContext.fetch(descriptor).first
+    }
+
+    private func fetchPOI(id: UUID?) throws -> POI? {
+        guard let id else { return nil }
+        let descriptor = FetchDescriptor<POI>(predicate: #Predicate { $0.id == id })
+        return try modelContext.fetch(descriptor).first
+    }
+
+    private nonisolated static func uuidValue(_ value: Any?) -> UUID? {
+        guard let value, !(value is NSNull) else { return nil }
+        if let uuid = value as? UUID { return uuid }
+        if let string = value as? String { return UUID(uuidString: string) }
+        return nil
     }
 
     // MARK: - Pull DownloadPackages

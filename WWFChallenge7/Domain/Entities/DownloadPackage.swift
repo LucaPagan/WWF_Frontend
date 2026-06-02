@@ -31,6 +31,7 @@ final class DownloadPackage {
 
     /// Local path where the bundle has been saved (nil = not yet downloaded)
     var localPath: String?
+    var installedManifestSHA256: String?
 
     @Transient var tier: ContentTier {
         get { ContentTier(rawValue: tierRawValue) ?? .light }
@@ -40,7 +41,22 @@ final class DownloadPackage {
     var isDownloaded: Bool {
         guard let path = localPath else { return false }
         if path == "offline_ready" { return false }
-        return FileManager.default.fileExists(atPath: path)
+        guard FileManager.default.fileExists(atPath: path) else { return false }
+        if let remote = manifestSHA256, let installed = installedManifestSHA256 {
+            return remote == installed
+        }
+        return manifestSHA256 == nil
+    }
+
+    var needsUpdate: Bool {
+        guard let path = localPath,
+              path != "offline_ready",
+              FileManager.default.fileExists(atPath: path),
+              let remote = manifestSHA256,
+              let installed = installedManifestSHA256 else {
+            return false
+        }
+        return remote != installed
     }
 
     var formattedSize: String {
@@ -73,6 +89,7 @@ final class DownloadPackage {
         self.errorMessage = nil
         self.requiredAppVersion = nil
         self.localPath = nil
+        self.installedManifestSHA256 = nil
         self.createdAt = Date()
         self.updatedAt = Date()
     }

@@ -3,10 +3,16 @@ import SwiftData
 import Combine
 import CryptoKit
 
-struct GamificationRewardSummary: Identifiable, Equatable {
-    let id = UUID()
+struct GamificationRewardSummary: Identifiable, Equatable, Codable {
+    let id: UUID
     let title: String
     let detail: String
+
+    init(id: UUID = UUID(), title: String, detail: String) {
+        self.id = id
+        self.title = title
+        self.detail = detail
+    }
 }
 
 struct TrailValidationResult {
@@ -19,6 +25,8 @@ struct TrailValidationResult {
 final class GamificationService: ObservableObject {
     @Published var latestRewards: [GamificationRewardSummary] = []
     @Published var latestLevelUp: LocalGamificationLevel?
+    @Published var deferredRewardsQueue: [GamificationRewardSummary] = []
+    @Published var isNavigatingTrail: Bool = false
 
     private var context: ModelContext?
     private var userSession: UserSession?
@@ -29,12 +37,14 @@ final class GamificationService: ObservableObject {
     private let xpLevelService = XPLevelService()
     private let trailValidator = TrailCompletionValidator()
     private let eventCompletionService = EventCompletionService()
+    private let deferredRewardsStorageKey = "wwf.deferredRewardsQueue"
     private var registrationObserver: NSObjectProtocol?
 
     func configure(with context: ModelContext, userSession: UserSession) {
         self.context = context
         self.userSession = userSession
         _ = xpLevelService.ensureStats(context: context, deviceId: userSession.deviceId)
+        restoreDeferredRewards()
 
         registrationObserver = NotificationCenter.default.addObserver(
             forName: .wwfUserDidRegister,
@@ -231,11 +241,43 @@ final class GamificationService: ObservableObject {
         }
 
         xpLevelService.refreshCounters(context: context, deviceId: userSession.deviceId)
-        latestRewards = summaries
+        
+        if isNavigatingTrail {
+            deferredRewardsQueue.append(contentsOf: summaries)
+            persistDeferredRewards()
+        } else {
+            latestRewards = summaries
+        }
+        
         try? context.save()
 
         if !userSession.isAnonymous {
             Task { await syncPendingIfRegistered() }
+        }
+    }
+
+    func flushDeferredRewards() {
+        guard !deferredRewardsQueue.isEmpty else { return }
+        latestRewards = deferredRewardsQueue
+        deferredRewardsQueue.removeAll()
+        persistDeferredRewards()
+    }
+
+    private func restoreDeferredRewards() {
+        guard let data = UserDefaults.standard.data(forKey: deferredRewardsStorageKey),
+              let restored = try? JSONDecoder().decode([GamificationRewardSummary].self, from: data) else {
+            return
+        }
+        deferredRewardsQueue = restored
+    }
+
+    private func persistDeferredRewards() {
+        if deferredRewardsQueue.isEmpty {
+            UserDefaults.standard.removeObject(forKey: deferredRewardsStorageKey)
+            return
+        }
+        if let data = try? JSONEncoder().encode(deferredRewardsQueue) {
+            UserDefaults.standard.set(data, forKey: deferredRewardsStorageKey)
         }
     }
 
@@ -440,12 +482,18 @@ final class XPLevelService {
 
     func refreshCounters(context: ModelContext, deviceId: String) {
         let stats = ensureStats(context: context, deviceId: deviceId)
-        let visits = ((try? context.fetch(FetchDescriptor<LocalPOIVisit>())) ?? [])
+        let visits = ((try? context.fetch(FetchDescriptor<LocalTrailProgress>())) ?? [])
+            .flatMap(\.visits)
             .reduce(into: Set<UUID>()) { $0.insert($1.poiId) }
         stats.poisVisitedCount = visits.count
         stats.trailsCompletedCount = ((try? context.fetch(FetchDescriptor<LocalTrailProgress>(
             predicate: #Predicate { $0.statusRawValue == "completed" }
         ))) ?? []).count
+        let acceptedEventLogs = ((try? context.fetch(FetchDescriptor<LocalValidationLog>(
+            predicate: #Predicate { $0.eventType == "event_completed" && $0.statusRawValue == "accepted" }
+        ))) ?? [])
+        let uniqueAcceptedEvents = Set(acceptedEventLogs.compactMap(\.entityId))
+        stats.eventsCompletedCount = max(uniqueAcceptedEvents.count, acceptedEventLogs.count)
         stats.badgesUnlockedCount = ((try? context.fetch(FetchDescriptor<LocalUserBadge>(
             predicate: #Predicate { $0.deviceId == deviceId }
         ))) ?? []).count
@@ -580,6 +628,7 @@ final class EventCompletionService {
 @MainActor
 final class GamificationSyncService {
     private let networkClient: NetworkClient
+    private let xpLevelService = XPLevelService()
 
     init(networkClient: NetworkClient? = nil) {
         self.networkClient = networkClient ?? SupabaseConfig.shared
@@ -695,6 +744,7 @@ final class GamificationSyncService {
             if existing == nil { context.insert(local) }
         }
 
+        xpLevelService.refreshCounters(context: context, deviceId: deviceId)
         try context.save()
     }
 

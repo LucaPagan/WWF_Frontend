@@ -28,11 +28,11 @@ struct DownloadSelectionView: View {
                     // Header
                     VStack(spacing: 8) {
                         Text(localizer.localizedString(for: "prepare_trail"))
-                            .font(.system(size: 30, weight: .bold, design: .rounded))
+                            .font(WWFDesign.Typography.largeTitleRounded)
                             .foregroundColor(WWFDesign.Colors.forestDark)
                         Text(localizer.localizedString(for: "download_offline_desc"))
-                            .font(.system(size: 15))
-                            .foregroundColor(.secondary)
+                            .font(WWFDesign.Typography.trailDescBody)
+                            .foregroundColor(WWFDesign.Colors.forestDark.opacity(0.70))
                             .multilineTextAlignment(.center)
                         
                         Spacer()
@@ -44,7 +44,7 @@ struct DownloadSelectionView: View {
                     // Tier Selection
                     VStack(alignment: .leading, spacing: 16) {
                         Text(localizer.localizedString(for: "choose_how_much_download"))
-                            .font(.system(size: 20, weight: .bold, design: .rounded))
+                            .font(WWFDesign.Typography.titleRounded)
                             .foregroundColor(WWFDesign.Colors.forestDark)
                             .padding(.horizontal)
                             .padding(.top, 8)
@@ -54,7 +54,8 @@ struct DownloadSelectionView: View {
                                 TierSelectionRow(
                                     tier: tier,
                                     isSelected: selectedTier == tier,
-                                    isDownloaded: downloadedTiers.contains(tier),
+                                    isDownloaded: isTierUsableOffline(tier),
+                                    needsUpdate: package(for: tier)?.needsUpdate == true,
                                     onSelect: { selectedTier = tier }
                                 )
                             }
@@ -74,7 +75,8 @@ struct DownloadSelectionView: View {
                                 .foregroundColor(.secondary)
                         }
                     } else {
-                        let isCurrentTierDownloaded = downloadedTiers.contains(selectedTier)
+                        let isCurrentTierDownloaded = isTierUsableOffline(selectedTier)
+                        let selectedNeedsUpdate = package(for: selectedTier)?.needsUpdate == true
                         let packageAvailable = package(for: selectedTier) != nil
 
                         if let error = downloadManager.error {
@@ -83,14 +85,14 @@ struct DownloadSelectionView: View {
                                 .foregroundColor(.red)
                                 .multilineTextAlignment(.center)
                         } else if !packageAvailable && !isCurrentTierDownloaded {
-                            Text("Bundle offline non ancora disponibile. Riprova dopo la sincronizzazione.")
+                            Text(LocalizationManager.shared.localizedString(for: "offline_bundle_unavailable"))
                                 .font(WWFDesign.Typography.trailDesc)
                                 .foregroundColor(.secondary)
                                 .multilineTextAlignment(.center)
                         }
                         
                         Button {
-                            if isCurrentTierDownloaded {
+                            if isCurrentTierDownloaded && !selectedNeedsUpdate {
                                 onDownloadComplete?()
                                 if onDownloadComplete == nil {
                                     dismiss()
@@ -102,8 +104,8 @@ struct DownloadSelectionView: View {
                             }
                         } label: {
                             HStack {
-                                Image(systemName: isCurrentTierDownloaded ? "play.fill" : "icloud.and.arrow.down.fill")
-                                Text(isCurrentTierDownloaded ? localizer.localizedString(for: "use_this_version") : localizer.localizedString(for: "download_and_start"))
+                                Image(systemName: isCurrentTierDownloaded && !selectedNeedsUpdate ? "play.fill" : "icloud.and.arrow.down.fill")
+                                Text(buttonTitle(isDownloaded: isCurrentTierDownloaded, needsUpdate: selectedNeedsUpdate))
                                     .fontWeight(.bold)
                                     .font(WWFDesign.Typography.trailName)
                             }
@@ -111,8 +113,9 @@ struct DownloadSelectionView: View {
                             .padding()
                             .background(WWFDesign.Colors.forestMid)
                             .foregroundColor(.white)
-                            .clipShape(RoundedRectangle(cornerRadius: WWFDesign.Radius.card))
-                            .shadow(color: WWFDesign.Colors.forestMid.opacity(0.2), radius: 8, x: 0, y: 4)
+                            .clipShape(Capsule())
+                            .overlay(Capsule().stroke(WWFDesign.Colors.organicOutline.opacity(0.22), lineWidth: 1))
+                            .shadow(color: WWFDesign.Colors.forestDark.opacity(0.09), radius: 8, x: 0, y: 3)
                         }
                         .opacity(!isCurrentTierDownloaded && !packageAvailable ? 0.75 : 1)
                         .accessibilityLabel(isCurrentTierDownloaded ? "Usa questa versione e inizia" : "Scarica e inizia")
@@ -132,14 +135,14 @@ struct DownloadSelectionView: View {
                 .padding(24)
             }
         }
-        .background(Color(.systemGroupedBackground).ignoresSafeArea())
+        .background(WWFDesign.Colors.backgroundCream.ignoresSafeArea())
         .overlay(alignment: .topTrailing) {
             Button {
                 dismiss()
             } label: {
                 Image(systemName: "xmark.circle.fill")
                     .font(.title2)
-                    .foregroundColor(Color.secondary.opacity(0.7))
+                    .foregroundColor(WWFDesign.Colors.forestDark.opacity(0.72))
                     .padding(16)
                     .background(Color.white.opacity(0.001)) // Increase touch target
             }
@@ -154,6 +157,24 @@ struct DownloadSelectionView: View {
             )
             let packages = (try? modelContext.fetch(descriptor)) ?? []
             return Set(packages.filter { $0.isDownloaded }.map { $0.tier })
+        }
+
+        private func isTierUsableOffline(_ tier: ContentTier) -> Bool {
+            let trailId = trail.id
+            let descriptor = FetchDescriptor<DownloadPackage>(
+                predicate: #Predicate<DownloadPackage> { $0.pathId == trailId && $0.isReady == true }
+            )
+            let packages = (try? modelContext.fetch(descriptor)) ?? []
+            return packages.contains { package in
+                package.tier.includes(tier) && package.isDownloaded
+            }
+        }
+
+        private func buttonTitle(isDownloaded: Bool, needsUpdate: Bool) -> String {
+            if isDownloaded && needsUpdate {
+                return localizer.localizedString(for: "update_downloaded_bundle")
+            }
+            return isDownloaded ? localizer.localizedString(for: "use_this_version") : localizer.localizedString(for: "download_and_start")
         }
         
         
@@ -200,6 +221,7 @@ struct TierSelectionRow: View {
     let tier: ContentTier
     let isSelected: Bool
     let isDownloaded: Bool
+    let needsUpdate: Bool
     let onSelect: () -> Void
     @ObservedObject private var localizer = LocalizationManager.shared
     
@@ -207,11 +229,15 @@ struct TierSelectionRow: View {
         Button(action: onSelect) {
             HStack(alignment: .top, spacing: 16) {
                 ZStack {
-                    Circle()
-                        .fill(isSelected ? WWFDesign.Colors.forestMid : Color.gray.opacity(0.08))
+                    OrganicBlobShape(variant: tierBlobVariant)
+                        .fill(isSelected ? WWFDesign.Colors.forestMid : WWFDesign.Colors.easyFill)
                         .frame(width: 44, height: 44)
+                        .overlay(
+                            OrganicBlobShape(variant: tierBlobVariant)
+                                .stroke(WWFDesign.Colors.organicOutline.opacity(isSelected ? 0.30 : 0.18), lineWidth: 1)
+                        )
                     Image(systemName: tierIcon)
-                        .font(.body)
+                        .font(WWFDesign.Typography.body)
                         .foregroundColor(isSelected ? .white : WWFDesign.Colors.forestDark.opacity(0.65))
                 }
                 
@@ -236,9 +262,17 @@ struct TierSelectionRow: View {
                         .fontWeight(.bold)
                         .foregroundColor(WWFDesign.Colors.forestLight)
                     
-                    if isDownloaded {
+                    if needsUpdate {
+                        Text(localizer.localizedString(for: "update_available_chip"))
+                            .font(WWFDesign.Typography.caption.weight(.bold))
+                            .foregroundColor(WWFDesign.Colors.warningText)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(WWFDesign.Colors.warningFill)
+                            .clipShape(Capsule())
+                    } else if isDownloaded {
                         Text(localizer.localizedString(for: "downloaded_chip"))
-                            .font(.caption2.weight(.bold))
+                            .font(WWFDesign.Typography.caption.weight(.bold))
                             .foregroundColor(WWFDesign.Colors.easyText)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
@@ -246,19 +280,24 @@ struct TierSelectionRow: View {
                             .clipShape(Capsule())
                     } else if isSelected {
                         Image(systemName: "checkmark.circle.fill")
-                            .font(.body)
+                            .font(WWFDesign.Typography.body)
                             .foregroundColor(WWFDesign.Colors.forestMid)
                     }
                 }
             }
             .padding()
-            .background(Color(.systemBackground))
-            .clipShape(RoundedRectangle(cornerRadius: WWFDesign.Radius.card))
+            .background(WWFDesign.Colors.cardCream)
+            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: WWFDesign.Radius.card)
-                    .stroke(isSelected ? WWFDesign.Colors.forestMid : Color.clear, lineWidth: 1.5)
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    .stroke(WWFDesign.Colors.organicOutline.opacity(isSelected ? 0.34 : 0.18), lineWidth: isSelected ? 1.3 : 1)
             )
-            .shadow(color: Color.black.opacity(isSelected ? 0.04 : 0.01), radius: 4, x: 0, y: 2)
+            .overlay(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .stroke(WWFDesign.Colors.organicInset.opacity(0.62), lineWidth: 1)
+                    .padding(4)
+            )
+            .shadow(color: WWFDesign.Colors.forestDark.opacity(isSelected ? 0.09 : 0.05), radius: 7, x: 0, y: 3)
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(localizer.localizedString(for: "tier_" + tier.rawValue)). \(localizer.localizedString(for: "tier_" + tier.rawValue + "_desc")). \(tier.sizeLabel). \(isDownloaded ? "Già scaricato" : "")")
@@ -272,5 +311,12 @@ struct TierSelectionRow: View {
         case .full:     return "arkit"
         }
     }
-}
 
+    private var tierBlobVariant: Int {
+        switch tier {
+        case .light: return 0
+        case .standard: return 1
+        case .full: return 2
+        }
+    }
+}

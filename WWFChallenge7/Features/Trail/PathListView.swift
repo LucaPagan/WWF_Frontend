@@ -43,7 +43,7 @@ struct PathStepRow: View {
                         .fill(stepNumber == 1 ? WWFDesign.Colors.forestLight.opacity(0.15) : Color(.systemGray5))
                         .frame(width: 44, height: 44)
                     Text("\(stepNumber)")
-                        .font(.headline)
+                        .font(WWFDesign.Typography.headline)
                         .foregroundColor(stepNumber == 1 ? WWFDesign.Colors.forestLight : .primary)
                 }
                 .padding(.top, 12)
@@ -52,32 +52,32 @@ struct PathStepRow: View {
                 VStack(alignment: .leading, spacing: 8) {
                     if let poi = step.poi {
                         Text(poi.localizedName)
-                            .font(.headline)
+                            .font(WWFDesign.Typography.headline)
 
                         // POI type badge
                         HStack(spacing: 4) {
                             Image(systemName: poi.type.icon)
-                                .font(.caption)
+                                .font(WWFDesign.Typography.caption)
                             Text(poi.type.displayName)
-                                .font(.caption)
+                                .font(WWFDesign.Typography.caption)
                         }
                         .foregroundColor(poi.type.color)
                     }
 
                     // Direction hint
                     Text(step.instructions)
-                        .font(.body)
+                        .font(WWFDesign.Typography.body)
                         .foregroundColor(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
 
                     // Distance and time chips
                     HStack(spacing: 16) {
                         Label("\(step.distanceMeters)m", systemImage: "figure.walk")
-                            .font(.subheadline)
+                            .font(WWFDesign.Typography.subheadline)
                             .foregroundColor(.secondary)
 
                         Label("\(step.estimatedMinutes) min", systemImage: "clock")
-                            .font(.subheadline)
+                            .font(WWFDesign.Typography.subheadline)
                             .foregroundColor(.secondary)
                     }
                     .padding(.top, 4)

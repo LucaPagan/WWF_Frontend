@@ -5,7 +5,7 @@ enum OfflineQRResolution: Equatable {
     case globalAlert(POI)
     case notInDownloadedTrail
     case unknown
-    case alreadyVisited
+    case alreadyVisited(POI)
 }
 
 struct OfflineQRResolver {
@@ -27,7 +27,7 @@ struct OfflineQRResolver {
         let pathPOIs = trail.sortedSteps.compactMap { $0.poi }
         if let poi = pathPOIs.first(where: { numeric ? $0.numericCode == clean : $0.qrPayload == clean }) {
             if completedPOIIds.contains(poi.id) {
-                return .alreadyVisited
+                return .alreadyVisited(poi)
             }
             return .trailPOI(poi)
         }

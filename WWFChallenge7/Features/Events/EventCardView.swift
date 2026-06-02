@@ -33,7 +33,7 @@ struct EventCardView: View {
                 CardBlobShape()
                     .fill(categoryColor)
                 CardBlobShape()
-                    .stroke(Color.black, lineWidth: 2.5)
+                    .stroke(WWFDesign.Colors.organicOutline.opacity(0.55), lineWidth: 1.4)
             }
             .frame(width: 32)
             
@@ -45,7 +45,7 @@ struct EventCardView: View {
                         .foregroundColor(.black)
                     
                     Text(event.localizedDescription)
-                        .font(.system(size: 15, weight: .regular))
+                        .font(WWFDesign.Typography.trailDescBody)
                         .foregroundColor(.black.opacity(0.8))
                         // CHANGED: lineLimit increased to 3 — prevents mid-word truncation ("ci...")
                         // matching the full description visible in image 2
@@ -60,7 +60,7 @@ struct EventCardView: View {
                         Image(systemName: "leaf.fill")
                             .font(.caption)
                         Text(difficultyLabel)
-                            .font(.system(size: 14, weight: .semibold))
+                            .font(WWFDesign.Typography.chipLabel.weight(.semibold))
                     }
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
@@ -72,7 +72,7 @@ struct EventCardView: View {
                             .font(.caption)
                             .foregroundColor(customEventCardBrown)
                         Text("\(event.trail?.estimatedMinutes ?? 60) min")
-                            .font(.system(size: 14, weight: .medium))
+                            .font(WWFDesign.Typography.chipLabel)
                             .foregroundColor(.black)
                     }
                     
@@ -81,8 +81,8 @@ struct EventCardView: View {
                         Image(systemName: "shoe.fill")
                             .font(.caption)
                             .foregroundColor(customEventCardBrown)
-                        Text("\(event.trail?.steps.count) \(localizer.localizedString(for: "steps_label"))")
-                            .font(.system(size: 14, weight: .medium))
+                        Text("\(event.trail?.steps.count ?? 0) \(localizer.localizedString(for: "steps_label"))")
+                            .font(WWFDesign.Typography.chipLabel)
                             .foregroundColor(.black)
                     }
                 }
@@ -91,12 +91,29 @@ struct EventCardView: View {
             .padding(.trailing, 12)
             .padding(.leading, 12)
         }
-        .background(Color.white)
-        .clipShape(RoundedRectangle(cornerRadius: 24))
-        .overlay(RoundedRectangle(cornerRadius: 24).stroke(Color.black, lineWidth: 2.5))
+        .background {
+            ZStack(alignment: .topTrailing) {
+                WWFDesign.Colors.cardCream
+                OrganicBlobShape(variant: isHighlighted ? 2 : 1)
+                    .fill(categoryColor.opacity(isHighlighted ? 0.16 : 0.10))
+                    .frame(width: 120, height: 90)
+                    .offset(x: 34, y: -22)
+            }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 28, style: .continuous)
+                .stroke(WWFDesign.Colors.organicOutline.opacity(0.28), lineWidth: 1.2)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .stroke(WWFDesign.Colors.organicInset.opacity(0.72), lineWidth: 1)
+                .padding(4)
+        )
+        .shadow(color: WWFDesign.Colors.forestDark.opacity(0.08), radius: 8, x: 0, y: 3)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(event.trail?.localizedName). \(event.trail?.localizedDescription). \(difficultyLabel). \(event.trail?.estimatedMinutes ?? 60) minuti. \(event.trail?.steps.count) tappe.")
-        .accessibilityHint("Tocca due volte per aprire i dettagli del percorso")
+        .accessibilityLabel("\(event.trail?.localizedName ?? event.localizedName). \(event.trail?.localizedDescription ?? event.localizedDescription). \(difficultyLabel). \(event.trail?.estimatedMinutes ?? 60) \(localizer.localizedString(for: "minutes_word")). \(event.trail?.steps.count ?? 0) \(localizer.localizedString(for: "steps_label")).")
+        .accessibilityHint(localizer.localizedString(for: "open_trail_details_hint"))
         .accessibilityAddTraits(.isButton)
     }
 }

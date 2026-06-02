@@ -28,6 +28,13 @@ final class LocalizationManager: ObservableObject {
     func configure(with container: ModelContainer) {
         self.modelContainer = container
     }
+
+    func setLanguage(_ languageCode: String) {
+        let supported = ["it", "en", "de", "fr"]
+        let normalized = supported.contains(languageCode) ? languageCode : "it"
+        guard preferredLanguage != normalized else { return }
+        preferredLanguage = normalized
+    }
     
     /// System translations for UI elements. Super scalable and customizable!
     private let uiTranslations: [String: [String: String]] = [
@@ -61,11 +68,167 @@ final class LocalizationManager: ObservableObject {
             "de": "Sprachausgabe",
             "fr": "Lecture audio"
         ],
+        "stop_audio": [
+            "it": "Ferma audio",
+            "en": "Stop audio",
+            "de": "Audio stoppen",
+            "fr": "Arrêter l'audio"
+        ],
+        "start_audio_accessibility_label": [
+            "it": "Avvia lettura vivavoce",
+            "en": "Start text-to-speech reading",
+            "de": "Sprachausgabe starten",
+            "fr": "Démarrer la lecture audio"
+        ],
+        "stop_audio_accessibility_label": [
+            "it": "Ferma lettura vivavoce",
+            "en": "Stop text-to-speech reading",
+            "de": "Sprachausgabe stoppen",
+            "fr": "Arrêter la lecture audio"
+        ],
+        "audio_reading_accessibility_hint": [
+            "it": "Tocca due volte per avviare o fermare la lettura della descrizione.",
+            "en": "Double tap to start or stop reading the description.",
+            "de": "Doppeltippen, um das Vorlesen der Beschreibung zu starten oder zu stoppen.",
+            "fr": "Touchez deux fois pour démarrer ou arrêter la lecture de la description."
+        ],
+        "open_ar": [
+            "it": "Apri AR",
+            "en": "Open AR",
+            "de": "AR öffnen",
+            "fr": "Ouvrir l'AR"
+        ],
+        "open_ar_accessibility_label": [
+            "it": "Apri esperienza in realtà aumentata",
+            "en": "Open augmented reality experience",
+            "de": "Augmented-Reality-Erlebnis öffnen",
+            "fr": "Ouvrir l'expérience en réalité augmentée"
+        ],
+        "open_ar_accessibility_hint": [
+            "it": "Apre la fotocamera e permette di posizionare il modello 3D nell'ambiente.",
+            "en": "Opens the camera and lets you place the 3D model in the environment.",
+            "de": "Öffnet die Kamera und ermöglicht das Platzieren des 3D-Modells in der Umgebung.",
+            "fr": "Ouvre la caméra et permet de placer le modèle 3D dans l'environnement."
+        ],
+        "open_gallery_accessibility_hint": [
+            "it": "Tocca due volte per aprire la galleria a schermo intero.",
+            "en": "Double tap to open the full-screen gallery.",
+            "de": "Doppeltippen, um die Galerie im Vollbild zu öffnen.",
+            "fr": "Touchez deux fois pour ouvrir la galerie en plein écran."
+        ],
+        "media_thumbnail_accessibility_hint": [
+            "it": "Tocca due volte per aprire questo contenuto.",
+            "en": "Double tap to open this content.",
+            "de": "Doppeltippen, um diesen Inhalt zu öffnen.",
+            "fr": "Touchez deux fois pour ouvrir ce contenu."
+        ],
+        "continue_trail_accessibility_hint": [
+            "it": "Chiude questa scheda e continua il percorso.",
+            "en": "Closes this card and continues the trail.",
+            "de": "Schließt diese Karte und setzt den Weg fort.",
+            "fr": "Ferme cette fiche et continue le sentier."
+        ],
+        "close_modal_accessibility_hint": [
+            "it": "Chiude la scheda del punto di interesse.",
+            "en": "Closes the point of interest card.",
+            "de": "Schließt die Karte des interessanten Ortes.",
+            "fr": "Ferme la fiche du point d'intérêt."
+        ],
+        "close_gallery_accessibility_hint": [
+            "it": "Chiude la galleria e torna alla scheda.",
+            "en": "Closes the gallery and returns to the card.",
+            "de": "Schließt die Galerie und kehrt zur Karte zurück.",
+            "fr": "Ferme la galerie et revient à la fiche."
+        ],
+        "content_type_text": [
+            "it": "Testo",
+            "en": "Text",
+            "de": "Text",
+            "fr": "Texte"
+        ],
+        "content_type_image": [
+            "it": "Immagine",
+            "en": "Image",
+            "de": "Bild",
+            "fr": "Image"
+        ],
+        "content_type_video": [
+            "it": "Video",
+            "en": "Video",
+            "de": "Video",
+            "fr": "Vidéo"
+        ],
+        "content_type_model_3d": [
+            "it": "Modello 3D",
+            "en": "3D Model",
+            "de": "3D-Modell",
+            "fr": "Modèle 3D"
+        ],
+        "content_type_audio": [
+            "it": "Audio",
+            "en": "Audio",
+            "de": "Audio",
+            "fr": "Audio"
+        ],
+        "content_type_transcript": [
+            "it": "Trascrizione",
+            "en": "Transcript",
+            "de": "Transkript",
+            "fr": "Transcription"
+        ],
         "close": [
             "it": "Chiudi",
             "en": "Close",
             "de": "Schließen",
             "fr": "Fermer"
+        ],
+        "exit_trail": [
+            "it": "Esci",
+            "en": "Exit",
+            "de": "Beenden",
+            "fr": "Quitter"
+        ],
+        "exit_trail_title": [
+            "it": "Uscire dal percorso?",
+            "en": "Exit the trail?",
+            "de": "Weg beenden?",
+            "fr": "Quitter le sentier ?"
+        ],
+        "exit_trail_message": [
+            "it": "Se esci adesso, questa esperienza ripartirà da zero la prossima volta. Se chiudi l'app senza uscire, invece, potrai riprendere da dove eri arrivato.",
+            "en": "If you exit now, this experience will restart from the beginning next time. If you close the app without exiting, you can resume where you left off.",
+            "de": "Wenn du jetzt beendest, startet dieses Erlebnis beim nächsten Mal von vorn. Wenn du die App nur schließt, kannst du dort weitermachen, wo du aufgehört hast.",
+            "fr": "Si vous quittez maintenant, cette expérience recommencera depuis le début la prochaine fois. Si vous fermez simplement l'app, vous pourrez reprendre où vous en étiez."
+        ],
+        "exit_and_reset": [
+            "it": "Esci e azzera",
+            "en": "Exit and reset",
+            "de": "Beenden und zurücksetzen",
+            "fr": "Quitter et réinitialiser"
+        ],
+        "exit_trail_accessibility_hint": [
+            "it": "Mostra una conferma prima di uscire e azzerare i progressi locali di questa esperienza.",
+            "en": "Shows a confirmation before exiting and resetting local progress for this experience.",
+            "de": "Zeigt eine Bestätigung, bevor der lokale Fortschritt dieses Erlebnisses zurückgesetzt wird.",
+            "fr": "Affiche une confirmation avant de quitter et de réinitialiser la progression locale de cette expérience."
+        ],
+        "change_map_type": [
+            "it": "Cambia tipo di mappa",
+            "en": "Change map type",
+            "de": "Kartentyp ändern",
+            "fr": "Changer le type de carte"
+        ],
+        "change_map_type_hint": [
+            "it": "Permette di scegliere tra mappa 2D e mappe 3D.",
+            "en": "Lets you choose between the 2D map and 3D maps.",
+            "de": "Ermöglicht die Auswahl zwischen 2D-Karte und 3D-Karten.",
+            "fr": "Permet de choisir entre la carte 2D et les cartes 3D."
+        ],
+        "restart_trail": [
+            "it": "Ricomincia il percorso",
+            "en": "Restart trail",
+            "de": "Weg neu starten",
+            "fr": "Recommencer le sentier"
         ],
         "settings": [
             "it": "Impostazioni",
@@ -228,6 +391,24 @@ final class LocalizationManager: ObservableObject {
             "en": "steps",
             "de": "Etappen",
             "fr": "étapes"
+        ],
+        "minutes_word": [
+            "it": "minuti",
+            "en": "minutes",
+            "de": "Minuten",
+            "fr": "minutes"
+        ],
+        "open_details_hint": [
+            "it": "Tocca due volte per aprire i dettagli",
+            "en": "Double-tap to open details",
+            "de": "Doppeltippen, um Details zu öffnen",
+            "fr": "Touchez deux fois pour ouvrir les détails"
+        ],
+        "open_trail_details_hint": [
+            "it": "Tocca due volte per aprire i dettagli del percorso",
+            "en": "Double-tap to open the trail details",
+            "de": "Doppeltippen, um die Wegdetails zu öffnen",
+            "fr": "Touchez deux fois pour ouvrir les détails du sentier"
         ],
         "trail_steps": [
             "it": "Tappe del percorso",
@@ -535,6 +716,18 @@ final class LocalizationManager: ObservableObject {
             "de": "Diese Version verwenden",
             "fr": "Utiliser cette version"
         ],
+        "update_downloaded_bundle": [
+            "it": "Aggiorna pacchetto",
+            "en": "Update package",
+            "de": "Paket aktualisieren",
+            "fr": "Mettre à jour le package"
+        ],
+        "update_available_chip": [
+            "it": "Aggiornamento",
+            "en": "Update",
+            "de": "Update",
+            "fr": "Mise à jour"
+        ],
         "cancel": [
             "it": "Annulla",
             "en": "Cancel",
@@ -774,6 +967,465 @@ final class LocalizationManager: ObservableObject {
             "en": "Warning",
             "de": "Warnung",
             "fr": "Avertissement"
+        ],
+        "enter_poi_code": [
+            "it": "Inserisci il codice del punto di interesse",
+            "en": "Enter the point of interest code",
+            "de": "Geben Sie den Code für den Ort von Interesse ein",
+            "fr": "Saisissez le code du point d'intérêt"
+        ],
+        "poi_code_hint": [
+            "it": "Il codice a 6 cifre è visibile sotto il QR code del POI",
+            "en": "The 6-digit code is visible under the POI's QR code",
+            "de": "Der 6-stellige Code befindet sich unter dem QR-Code des POI",
+            "fr": "Le code à 6 chiffres est visible sous le code QR du POI"
+        ],
+        "confirm_button": [
+            "it": "Conferma",
+            "en": "Confirm",
+            "de": "Bestätigen",
+            "fr": "Confirmer"
+        ],
+        "manual_code_entry": [
+            "it": "Codice manuale",
+            "en": "Manual code",
+            "de": "Manueller Code",
+            "fr": "Code manuel"
+        ],
+        "manual_code_title": [
+            "it": "Codice Manuale",
+            "en": "Manual Code",
+            "de": "Manueller Code",
+            "fr": "Code manuel"
+        ],
+        "six_digit_code": [
+            "it": "Codice a 6 cifre",
+            "en": "6-digit code",
+            "de": "6-stelliger Code",
+            "fr": "Code à 6 chiffres"
+        ],
+        "poi_numeric_code": [
+            "it": "Codice numerico POI",
+            "en": "POI numeric code",
+            "de": "Numerischer POI-Code",
+            "fr": "Code numérique du POI"
+        ],
+        "poi_code_accessibility_hint": [
+            "it": "Inserisci il codice a 6 cifre presente sotto il QR code",
+            "en": "Enter the 6-digit code shown below the QR code",
+            "de": "Geben Sie den 6-stelligen Code unter dem QR-Code ein",
+            "fr": "Saisissez le code à 6 chiffres sous le code QR"
+        ],
+        "code_confirmation_accessibility": [
+            "it": "Conferma codice",
+            "en": "Confirm code",
+            "de": "Code bestätigen",
+            "fr": "Confirmer le code"
+        ],
+        "code_confirmation_hint": [
+            "it": "Cerca il punto di interesse con il codice inserito",
+            "en": "Find the point of interest with the entered code",
+            "de": "Sucht den Ort von Interesse mit dem eingegebenen Code",
+            "fr": "Recherche le point d'intérêt avec le code saisi"
+        ],
+        "close_code_entry": [
+            "it": "Chiudi inserimento codice",
+            "en": "Close code entry",
+            "de": "Codeeingabe schließen",
+            "fr": "Fermer la saisie du code"
+        ],
+        "error_prefix": [
+            "it": "Errore",
+            "en": "Error",
+            "de": "Fehler",
+            "fr": "Erreur"
+        ],
+        "poi_found_announcement": [
+            "it": "POI trovato",
+            "en": "POI found",
+            "de": "POI gefunden",
+            "fr": "POI trouvé"
+        ],
+        "invalid_code_for_trail": [
+            "it": "Codice non valido per questo percorso",
+            "en": "Code not valid for this trail",
+            "de": "Code für diesen Weg ungültig",
+            "fr": "Code non valide pour ce sentier"
+        ],
+        "lookup_error": [
+            "it": "Errore nella ricerca",
+            "en": "Lookup error",
+            "de": "Fehler bei der Suche",
+            "fr": "Erreur de recherche"
+        ],
+        "xp_label": [
+            "it": "XP",
+            "en": "XP",
+            "de": "XP",
+            "fr": "XP"
+        ],
+        "save_progress_desc": [
+            "it": "Salva i tuoi progressi e porta con te la tua collezione",
+            "en": "Save your progress and take your collection with you",
+            "de": "Speichern Sie Ihren Fortschritt und nehmen Sie Ihre Sammlung mit",
+            "fr": "Enregistrez vos progrès et emportez votre collection avec vous"
+        ],
+        "next_button": [
+            "it": "Prossimo",
+            "en": "Next",
+            "de": "Weiter",
+            "fr": "Suivant"
+        ],
+        "text_and_reading": [
+            "it": "Testo e Lettura",
+            "en": "Text and Reading",
+            "de": "Text und Lesen",
+            "fr": "Texte et Lecture"
+        ],
+        "easy_read_label": [
+            "it": "Testo semplificato (Easy-to-Read)",
+            "en": "Simplified text (Easy-to-Read)",
+            "de": "Vereinfachter Text (Easy-to-Read)",
+            "fr": "Texte simplifié (Easy-to-Read)"
+        ],
+        "easy_read_accessibility_label": [
+            "it": "Testo semplificato Easy-to-Read",
+            "en": "Easy-to-Read simplified text",
+            "de": "Vereinfachter Easy-to-Read-Text",
+            "fr": "Texte simplifié Easy-to-Read"
+        ],
+        "easy_read_accessibility_hint": [
+            "it": "Mostra versioni semplificate dei contenuti dei punti di interesse, con frasi brevi e vocabolario semplice",
+            "en": "Shows simplified point of interest content with short sentences and simple vocabulary",
+            "de": "Zeigt vereinfachte Inhalte der Orte von Interesse mit kurzen Sätzen und einfachem Wortschatz",
+            "fr": "Affiche des contenus simplifiés des points d'intérêt avec des phrases courtes et un vocabulaire simple"
+        ],
+        "kids_mode_label": [
+            "it": "Modalità bambini",
+            "en": "Kids mode",
+            "de": "Kindermodus",
+            "fr": "Mode enfants"
+        ],
+        "kids_mode_accessibility_hint": [
+            "it": "Mostra solo percorsi adatti ai bambini con icone grandi e linguaggio semplice",
+            "en": "Shows only child-friendly trails with large icons and simple language",
+            "de": "Zeigt nur kinderfreundliche Wege mit großen Symbolen und einfacher Sprache",
+            "fr": "Affiche uniquement les sentiers adaptés aux enfants avec de grandes icônes et un langage simple"
+        ],
+        "simplified_text_desc": [
+            "it": "Il testo semplificato segue le linee guida Easy-to-Read europee per rendere i contenuti accessibili a tutti.",
+            "en": "Simplified text follows European Easy-to-Read guidelines to make content accessible to everyone.",
+            "de": "Der vereinfachte Text folgt den europäischen Easy-to-Read-Richtlinien, um Inhalte für alle zugänglich zu machen.",
+            "fr": "Le texte simplifié suit les directives européennes Easy-to-Read pour rendre le contenu accessible à tous."
+        ],
+        "navigation_label": [
+            "it": "Navigazione",
+            "en": "Navigation",
+            "de": "Navigation",
+            "fr": "Navigation"
+        ],
+        "list_view_desc": [
+            "it": "La vista lista è consigliata per utenti con lettore di schermo. Si attiva automaticamente quando VoiceOver è attivo.",
+            "en": "The list view is recommended for screen reader users. It activates automatically when VoiceOver is on.",
+            "de": "Die Listenansicht wird für Screenreader-Benutzer empfohlen. Sie wird automatisch aktiviert, wenn VoiceOver aktiviert ist.",
+            "fr": "La vue en liste est recommandée pour les utilisateurs de lecteurs d'écran. Elle s'active automatiquement lorsque VoiceOver est activé."
+        ],
+        "default_list_view": [
+            "it": "Vista lista come predefinita",
+            "en": "Use list view by default",
+            "de": "Listenansicht als Standard",
+            "fr": "Vue en liste par défaut"
+        ],
+        "default_list_view_hint": [
+            "it": "Mostra il percorso come lista di istruzioni testuali invece della mappa visiva",
+            "en": "Shows the trail as a list of text instructions instead of the visual map",
+            "de": "Zeigt den Weg als Liste von Textanweisungen statt als visuelle Karte",
+            "fr": "Affiche le sentier sous forme de liste d'instructions au lieu de la carte visuelle"
+        ],
+        "audio_feedback": [
+            "it": "Audio e Feedback",
+            "en": "Audio and Feedback",
+            "de": "Audio und Feedback",
+            "fr": "Audio et retours"
+        ],
+        "auto_audio_qr": [
+            "it": "Audio automatico al QR",
+            "en": "Automatic audio on QR",
+            "de": "Automatisches Audio bei QR",
+            "fr": "Audio automatique au QR"
+        ],
+        "auto_audio_qr_hint": [
+            "it": "Quando scansioni un QR code, avvia automaticamente la descrizione audio del punto di interesse",
+            "en": "Automatically starts the audio description of the point of interest when you scan a QR code",
+            "de": "Startet automatisch die Audiobeschreibung des Ortes von Interesse, wenn Sie einen QR-Code scannen",
+            "fr": "Lance automatiquement la description audio du point d'intérêt lorsque vous scannez un QR code"
+        ],
+        "recognition_haptics": [
+            "it": "Vibrazione al riconoscimento",
+            "en": "Vibration on recognition",
+            "de": "Vibration bei Erkennung",
+            "fr": "Vibration à la reconnaissance"
+        ],
+        "recognition_haptics_hint": [
+            "it": "Attiva una vibrazione quando il QR code viene riconosciuto con successo",
+            "en": "Triggers a vibration when the QR code is recognized successfully",
+            "de": "Löst eine Vibration aus, wenn der QR-Code erfolgreich erkannt wurde",
+            "fr": "Déclenche une vibration lorsque le QR code est reconnu avec succès"
+        ],
+        "system_accessibility": [
+            "it": "Accessibilità di sistema",
+            "en": "System Accessibility",
+            "de": "System-Barrierefreiheit",
+            "fr": "Accessibilité du système"
+        ],
+        "system_accessibility_desc": [
+            "it": "Per impostazioni avanzate come VoiceOver, Dynamic Type e Aumenta Contrasto, usa Impostazioni > Accessibilità del tuo dispositivo.",
+            "en": "For advanced settings like VoiceOver, Dynamic Type, and Increase Contrast, use Settings > Accessibility on your device.",
+            "de": "Für erweiterte Einstellungen wie VoiceOver, Dynamic Type und Kontrast erhöhen verwenden Sie die Einstellungen > Barrierefreiheit Ihres Geräts.",
+            "fr": "Pour des paramètres avancés comme VoiceOver, Dynamic Type et Augmenter le contraste, utilisez Réglages > Accessibilité sur votre appareil."
+        ],
+        "event_completion": [
+            "it": "Completamento evento",
+            "en": "Event Completion",
+            "de": "Veranstaltungsabschluss",
+            "fr": "Achèvement de l'événement"
+        ],
+        "scan_qr_short": [
+            "it": "Scansiona QR",
+            "en": "Scan QR",
+            "de": "QR scannen",
+            "fr": "Scanner QR"
+        ],
+        "code_label": [
+            "it": "Codice",
+            "en": "Code",
+            "de": "Code",
+            "fr": "Code"
+        ],
+        "completion_code_title": [
+            "it": "Codice completamento",
+            "en": "Completion code",
+            "de": "Abschlusscode",
+            "fr": "Code de validation"
+        ],
+        "completion_registered": [
+            "it": "Completamento registrato.",
+            "en": "Completion recorded.",
+            "de": "Abschluss gespeichert.",
+            "fr": "Validation enregistrée."
+        ],
+        "event_label": [
+            "it": "Evento",
+            "en": "Event",
+            "de": "Event",
+            "fr": "Événement"
+        ],
+        "back_button_accessibility": [
+            "it": "Torna indietro",
+            "en": "Go back",
+            "de": "Zurück",
+            "fr": "Retour"
+        ],
+        "offline_bundle_unavailable": [
+            "it": "Bundle offline non ancora disponibile. Riprova dopo la sincronizzazione.",
+            "en": "Offline bundle not yet available. Please try again after synchronization.",
+            "de": "Offline-Paket noch nicht verfügbar. Bitte versuchen Sie es nach der Synchronisierung erneut.",
+            "fr": "Pack hors ligne pas encore disponible. Veuillez réessayer après la synchronisation."
+        ],
+        "pois_visited": [
+            "it": "POI Visitati",
+            "en": "POIs Visited",
+            "de": "Besuchte POIs",
+            "fr": "POI visités"
+        ],
+        "species_discovered": [
+            "it": "Specie Scoperte",
+            "en": "Species Discovered",
+            "de": "Entdeckte Arten",
+            "fr": "Espèces découvertes"
+        ],
+        "species_filter_fauna": [
+            "it": "Fauna",
+            "en": "Fauna",
+            "de": "Fauna",
+            "fr": "Faune"
+        ],
+        "species_filter_flora": [
+            "it": "Flora",
+            "en": "Flora",
+            "de": "Flora",
+            "fr": "Flore"
+        ],
+        "species_filter_geology": [
+            "it": "Geologia",
+            "en": "Geology",
+            "de": "Geologie",
+            "fr": "Géologie"
+        ],
+        "species_filter_habitat": [
+            "it": "Habitat",
+            "en": "Habitat",
+            "de": "Lebensraum",
+            "fr": "Habitat"
+        ],
+        "your_badges": [
+            "it": "I tuoi Badge",
+            "en": "Your Badges",
+            "de": "Deine Abzeichen",
+            "fr": "Tes badges"
+        ],
+        "biodiversity_album": [
+            "it": "Album Biodiversità",
+            "en": "Biodiversity Album",
+            "de": "Biodiversitätsalbum",
+            "fr": "Album biodiversité"
+        ],
+        "no_badges_yet": [
+            "it": "Nessun badge ancora sbloccato.",
+            "en": "No badges unlocked yet.",
+            "de": "Noch keine Abzeichen freigeschaltet.",
+            "fr": "Aucun badge débloqué pour le moment."
+        ],
+        "no_species_in_category": [
+            "it": "Nessuna specie in questa categoria.",
+            "en": "No species in this category.",
+            "de": "Keine Arten in dieser Kategorie.",
+            "fr": "Aucune espèce dans cette catégorie."
+        ],
+        "completed_trails": [
+            "it": "Percorsi Completati",
+            "en": "Completed Trails",
+            "de": "Abgeschlossene Wege",
+            "fr": "Sentiers terminés"
+        ],
+        "no_trails_completed": [
+            "it": "Non hai ancora completato alcun percorso.",
+            "en": "No trails completed yet.",
+            "de": "Du hast noch keinen Weg abgeschlossen.",
+            "fr": "Tu n'as encore terminé aucun sentier."
+        ],
+        "your_statistics": [
+            "it": "Le tue Statistiche",
+            "en": "Your Statistics",
+            "de": "Deine Statistiken",
+            "fr": "Tes statistiques"
+        ],
+        "events_completed": [
+            "it": "Eventi completati",
+            "en": "Events Completed",
+            "de": "Abgeschlossene Events",
+            "fr": "Événements terminés"
+        ],
+        "badges_unlocked": [
+            "it": "Badge sbloccati",
+            "en": "Badges Unlocked",
+            "de": "Freigeschaltete Abzeichen",
+            "fr": "Badges débloqués"
+        ],
+        "explorer": [
+            "it": "Esploratore ospite",
+            "en": "Guest Explorer",
+            "de": "Gast-Entdecker",
+            "fr": "Explorateur invité"
+        ],
+        "visitor": [
+            "it": "Visitatore",
+            "en": "Visitor",
+            "de": "Besucher",
+            "fr": "Visiteur"
+        ],
+        "species_locked": [
+            "it": "Da scoprire",
+            "en": "To Discover",
+            "de": "Zu entdecken",
+            "fr": "À découvrir"
+        ],
+        "species_locked_hint": [
+            "it": "Continua a esplorare l'Oasi per completare questa scheda dell'album.",
+            "en": "Keep exploring the Oasis to complete this album card.",
+            "de": "Erkunde die Oase weiter, um diese Albumkarte zu vervollständigen.",
+            "fr": "Continue à explorer l'Oasis pour compléter cette fiche d'album."
+        ],
+        "congratulations": [
+            "it": "Congratulazioni",
+            "en": "Congratulations",
+            "de": "Glückwunsch",
+            "fr": "Félicitations"
+        ],
+        "badge_first_steps": [
+            "it": "Primi passi nell'Oasi",
+            "en": "First steps in the Oasis",
+            "de": "Erste Schritte in der Oase",
+            "fr": "Premiers pas dans l'Oasis"
+        ],
+        "badge_first_poi_hint": [
+            "it": "Visita il tuo primo punto di interesse.",
+            "en": "Visit your first point of interest.",
+            "de": "Besuche deinen ersten Ort von Interesse.",
+            "fr": "Visite ton premier point d'intérêt."
+        ],
+        "badge_complete_trail_hint": [
+            "it": "Completa tutte le tappe di un percorso.",
+            "en": "Complete every step of a trail.",
+            "de": "Schließe alle Etappen eines Weges ab.",
+            "fr": "Termine toutes les étapes d'un sentier."
+        ],
+        "badge_unlock_species_hint": [
+            "it": "Sblocca una specie nell'album biodiversità.",
+            "en": "Unlock a species in the biodiversity album.",
+            "de": "Schalte eine Art im Biodiversitätsalbum frei.",
+            "fr": "Débloque une espèce dans l'album biodiversité."
+        ],
+        "badge_join_event_hint": [
+            "it": "Partecipa a un evento.",
+            "en": "Join an event.",
+            "de": "Nimm an einem Event teil.",
+            "fr": "Participe à un événement."
+        ]
+    ]
+
+    private let knownContentTranslations: [String: [String: String]] = [
+        "Primi passi nell'Oasi": [
+            "it": "Primi passi nell'Oasi",
+            "en": "First steps in the Oasis",
+            "de": "Erste Schritte in der Oase",
+            "fr": "Premiers pas dans l'Oasis"
+        ],
+        "Visita il tuo primo punto di interesse.": [
+            "it": "Visita il tuo primo punto di interesse.",
+            "en": "Visit your first point of interest.",
+            "de": "Besuche deinen ersten Ort von Interesse.",
+            "fr": "Visite ton premier point d'intérêt."
+        ],
+        "Completa tutte le tappe di un percorso.": [
+            "it": "Completa tutte le tappe di un percorso.",
+            "en": "Complete every step of a trail.",
+            "de": "Schließe alle Etappen eines Weges ab.",
+            "fr": "Termine toutes les étapes d'un sentier."
+        ],
+        "Sblocca una specie nell'album biodiversità.": [
+            "it": "Sblocca una specie nell'album biodiversità.",
+            "en": "Unlock a species in the biodiversity album.",
+            "de": "Schalte eine Art im Biodiversitätsalbum frei.",
+            "fr": "Débloque une espèce dans l'album biodiversité."
+        ],
+        "Partecipa a un evento.": [
+            "it": "Partecipa a un evento.",
+            "en": "Join an event.",
+            "de": "Nimm an einem Event teil.",
+            "fr": "Participe à un événement."
+        ],
+        "Visitatore": [
+            "it": "Visitatore",
+            "en": "Visitor",
+            "de": "Besucher",
+            "fr": "Visiteur"
+        ],
+        "Esploratore ospite": [
+            "it": "Esploratore ospite",
+            "en": "Guest Explorer",
+            "de": "Gast-Entdecker",
+            "fr": "Explorateur invité"
         ]
     ]
     
@@ -781,6 +1433,12 @@ final class LocalizationManager: ObservableObject {
     func localizedString(for key: String) -> String {
         let lang = preferredLanguage
         return uiTranslations[key]?[lang] ?? uiTranslations[key]?["it"] ?? key
+    }
+
+    func localizedKnownContent(_ value: String?) -> String {
+        guard let value, !value.isEmpty else { return "" }
+        let lang = preferredLanguage
+        return knownContentTranslations[value]?[lang] ?? value
     }
     
     /// Resolves dynamic database model localization (e.g. POI name/description)

@@ -32,10 +32,18 @@ final class POI: @unchecked Sendable {
     var numericCode: String
     var descriptionKids: String?
     var descriptionEasyRead: String?
+    var arModelURL: String?
+    var arAnimationConfig: String?
+    var arModelTierRawValue: String?
 
     @Transient var type: POIType {
         get { POIType(rawValue: typeRawValue) ?? .landmark }
         set { typeRawValue = newValue.rawValue }
+    }
+
+    @Transient var arModelTier: ContentTier {
+        get { ContentTier(rawValue: arModelTierRawValue ?? "") ?? .full }
+        set { arModelTierRawValue = newValue.rawValue }
     }
 
     @Transient var localizedName: String {
@@ -73,6 +81,9 @@ final class POI: @unchecked Sendable {
         numericCode: String? = nil,
         descriptionKids: String? = nil,
         descriptionEasyRead: String? = nil,
+        arModelURL: String? = nil,
+        arAnimationConfig: String? = nil,
+        arModelTier: ContentTier = .full,
         fixedID: UUID? = nil
     ) {
         let newID = fixedID ?? UUID()
@@ -93,6 +104,9 @@ final class POI: @unchecked Sendable {
         self.numericCode = numericCode ?? String(format: "%06d", Int.random(in: 100000...999999))
         self.descriptionKids = descriptionKids
         self.descriptionEasyRead = descriptionEasyRead
+        self.arModelURL = arModelURL
+        self.arAnimationConfig = arAnimationConfig
+        self.arModelTierRawValue = arModelTier.rawValue
         self.createdAt = Date()
         self.updatedAt = Date()
         self.needsSync = true
@@ -114,7 +128,109 @@ final class POI: @unchecked Sendable {
         if let code = data["numeric_code"] as? String { numericCode = code }
         descriptionKids = data["description_kids"] as? String
         descriptionEasyRead = data["description_easy_read"] as? String
+        arModelURL = data["ar_model_url"] as? String
+        arAnimationConfig = POI.jsonString(from: data["ar_animation_config"])
+        if let arTier = data["ar_model_tier"] as? String { arModelTierRawValue = arTier }
         needsSync = false
+    }
+
+    nonisolated private static func jsonString(from value: Any?) -> String? {
+        if let string = value as? String { return string }
+        guard let value, JSONSerialization.isValidJSONObject(value),
+              let data = try? JSONSerialization.data(withJSONObject: value),
+              let string = String(data: data, encoding: .utf8) else {
+            return nil
+        }
+        return string
+    }
+}
+
+struct ARAnimationConfig: Codable, Equatable {
+    var rotationEnabled: Bool
+    var floatingEnabled: Bool
+    var pulseEnabled: Bool
+    var speed: Double
+    var floatAmplitude: Double
+    var pulseScale: Double
+
+    static let `default` = ARAnimationConfig(
+        rotationEnabled: true,
+        floatingEnabled: false,
+        pulseEnabled: false,
+        speed: 1.0,
+        floatAmplitude: 0.08,
+        pulseScale: 1.08
+    )
+
+    enum CodingKeys: String, CodingKey {
+        case rotationEnabled
+        case floatingEnabled
+        case pulseEnabled
+        case speed
+        case floatAmplitude
+        case pulseScale
+    }
+
+    init(
+        rotationEnabled: Bool,
+        floatingEnabled: Bool,
+        pulseEnabled: Bool,
+        speed: Double,
+        floatAmplitude: Double,
+        pulseScale: Double
+    ) {
+        self.rotationEnabled = rotationEnabled
+        self.floatingEnabled = floatingEnabled
+        self.pulseEnabled = pulseEnabled
+        self.speed = speed
+        self.floatAmplitude = floatAmplitude
+        self.pulseScale = pulseScale
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        rotationEnabled = container.flexibleBool(forKey: .rotationEnabled, default: Self.default.rotationEnabled)
+        floatingEnabled = container.flexibleBool(forKey: .floatingEnabled, default: Self.default.floatingEnabled)
+        pulseEnabled = container.flexibleBool(forKey: .pulseEnabled, default: Self.default.pulseEnabled)
+        speed = container.flexibleDouble(forKey: .speed, default: Self.default.speed)
+        floatAmplitude = container.flexibleDouble(forKey: .floatAmplitude, default: Self.default.floatAmplitude)
+        pulseScale = container.flexibleDouble(forKey: .pulseScale, default: Self.default.pulseScale)
+    }
+
+    static func decode(from string: String?) -> ARAnimationConfig {
+        guard let string,
+              let data = string.data(using: .utf8),
+              let config = try? JSONDecoder().decode(ARAnimationConfig.self, from: data) else {
+            return .default
+        }
+        return config
+    }
+}
+
+private extension KeyedDecodingContainer {
+    func flexibleBool(forKey key: Key, default defaultValue: Bool) -> Bool {
+        if let value = try? decode(Bool.self, forKey: key) { return value }
+        if let value = try? decode(Double.self, forKey: key) { return value != 0 }
+        if let value = try? decode(Int.self, forKey: key) { return value != 0 }
+        if let value = try? decode(String.self, forKey: key) {
+            switch value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+            case "true", "yes", "1": return true
+            case "false", "no", "0": return false
+            default: return defaultValue
+            }
+        }
+        return defaultValue
+    }
+
+    func flexibleDouble(forKey key: Key, default defaultValue: Double) -> Double {
+        if let value = try? decode(Double.self, forKey: key) { return value }
+        if let value = try? decode(Int.self, forKey: key) { return Double(value) }
+        if let value = try? decode(Bool.self, forKey: key) { return value ? defaultValue : 0 }
+        if let value = try? decode(String.self, forKey: key),
+           let parsed = Double(value.replacingOccurrences(of: ",", with: ".")) {
+            return parsed
+        }
+        return defaultValue
     }
 }
 

@@ -11,6 +11,7 @@ struct Visitor3DMapView: UIViewRepresentable {
     let currentNormalizedPosition: CGPoint
     let navigationState: TrailNavigationState
     let mapType: ThreeDMapType
+    var onCompletedPOITap: ((POI) -> Void)? = nil
 
     func makeCoordinator() -> Coordinator {
         Coordinator(self)
@@ -19,7 +20,7 @@ struct Visitor3DMapView: UIViewRepresentable {
     // Incapsula l'SCNView in una UIView standard per risolvere i bug di UI Reparenting in SwiftUI
     func makeUIView(context: Context) -> UIView {
         let container = UIView()
-        container.backgroundColor = .black
+        container.backgroundColor = UIColor(WWFDesign.Colors.backgroundCream)
         
         let scnView = SCNView()
         scnView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
@@ -28,7 +29,7 @@ struct Visitor3DMapView: UIViewRepresentable {
         // Settings della Scena
         scnView.allowsCameraControl = true
         scnView.autoenablesDefaultLighting = true // CRUCIALE: Risolve l'illuminazione base per PBR
-        scnView.backgroundColor = UIColor(white: 0.15, alpha: 1)
+        scnView.backgroundColor = UIColor(WWFDesign.Colors.backgroundCream)
         scnView.antialiasingMode = .multisampling4X
         scnView.preferredFramesPerSecond = 60
 
@@ -38,6 +39,9 @@ struct Visitor3DMapView: UIViewRepresentable {
 
         container.addSubview(scnView)
         context.coordinator.scnView = scnView
+
+        let tapGesture = UITapGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handleTap(_:)))
+        scnView.addGestureRecognizer(tapGesture)
         
         return container
     }
@@ -178,6 +182,7 @@ struct Visitor3DMapView: UIViewRepresentable {
         weak var scnView: SCNView?
 
         private var markerNodes: [String: SCNNode] = [:]
+        private var markerPOIs: [String: POI] = [:]
         private let userMarkerKey = "__user__"
         private let startMarkerKey = "__start__"
 
@@ -188,6 +193,7 @@ struct Visitor3DMapView: UIViewRepresentable {
         func refreshMarkers(in scene: SCNScene) {
             markerNodes.values.forEach { $0.removeFromParentNode() }
             markerNodes.removeAll()
+            markerPOIs.removeAll()
 
             let cfg = parent.mapType.configuration
             let mapSize = max(cfg.xScale, cfg.zScale)
@@ -213,19 +219,27 @@ struct Visitor3DMapView: UIViewRepresentable {
             markerNodes[startMarkerKey] = startNode
 
             // ── POI
-            for step in parent.trail.sortedSteps {
+            for step in visuallyDistinctMarkerSteps() {
                 guard let poi = step.poi else { continue }
                 let isCompleted = parent.completedPOIIds.contains(poi.id)
                 let isCurrent   = poi.id == parent.currentStepPOIId
 
-                let color: UIColor = isCompleted ? .gray : isCurrent ? .systemYellow : (UIColor(named: "WWFGreen") ?? .systemGreen)
+                let color: UIColor = isCompleted
+                    ? .systemGray
+                    : isCurrent
+                        ? UIColor(WWFDesign.Colors.leafLight)
+                        : (UIColor(named: "WWFGreen") ?? .systemGreen)
                 let icon = isCompleted ? "checkmark" : poi.type.icon
                 let pos  = cfg.worldPosition(for: CGPoint(x: poi.x, y: poi.y), in: scene)
 
                 let node = makePOIMarker(color: color, systemIcon: icon, size: markerSize, isAnimated: isCurrent, label: isCurrent ? poi.name : nil)
+                node.name = poi.id.uuidString
                 node.position = pos
                 scene.rootNode.addChildNode(node)
                 markerNodes[poi.id.uuidString] = node
+                if isCompleted {
+                    markerPOIs[poi.id.uuidString] = poi
+                }
             }
 
             // ── Posizione Utente
@@ -239,48 +253,128 @@ struct Visitor3DMapView: UIViewRepresentable {
             drawTrailPath(in: scene, cfg: cfg, mapSize: mapSize)
         }
 
+        private func visuallyDistinctMarkerSteps() -> [TrailStep] {
+            let startPoint = CGPoint(x: parent.trail.startX, y: parent.trail.startY)
+            var seenPOIIds = Set<UUID>()
+            var seenPoints: [CGPoint] = []
+            var result: [TrailStep] = []
+
+            for step in parent.trail.sortedSteps {
+                guard let poi = step.poi else { continue }
+
+                guard seenPOIIds.insert(poi.id).inserted else { continue }
+
+                let point = CGPoint(x: poi.x, y: poi.y)
+                if isSameVisualPoint(point, startPoint) { continue }
+                if seenPoints.contains(where: { isSameVisualPoint($0, point) }) { continue }
+
+                seenPoints.append(point)
+                result.append(step)
+            }
+
+            return result
+        }
+
+        private func isSameVisualPoint(_ lhs: CGPoint, _ rhs: CGPoint) -> Bool {
+            let dx = lhs.x - rhs.x
+            let dy = lhs.y - rhs.y
+            return hypot(dx, dy) < 0.012
+        }
+
+        @objc func handleTap(_ gesture: UITapGestureRecognizer) {
+            guard let scnView else { return }
+            let location = gesture.location(in: scnView)
+            let hits = scnView.hitTest(location, options: [.boundingBoxOnly: true])
+            for hit in hits {
+                var node: SCNNode? = hit.node
+                while let current = node {
+                    if let name = current.name, let poi = markerPOIs[name] {
+                        parent.onCompletedPOITap?(poi)
+                        return
+                    }
+                    node = current.parent
+                }
+            }
+        }
+
         // MARK: Helpers Nodi
 
         private func makePOIMarker(color: UIColor, systemIcon: String, size: CGFloat, isAnimated: Bool, label: String?) -> SCNNode {
             let root = SCNNode()
 
+            let shadow = SCNCylinder(radius: size * 0.92, height: size * 0.035)
+            shadow.radialSegmentCount = 40
+            let shadowMat = SCNMaterial()
+            shadowMat.diffuse.contents = UIColor(WWFDesign.Colors.forestDark).withAlphaComponent(0.18)
+            shadowMat.transparency = 0.30
+            shadow.materials = [shadowMat]
+            let shadowNode = SCNNode(geometry: shadow)
+            shadowNode.position = SCNVector3(0, Float(size) * 0.02, 0)
+            root.addChildNode(shadowNode)
+
+            let stemHeight = size * 1.30
+            let stem = SCNCone(topRadius: size * 0.48, bottomRadius: 0, height: stemHeight)
+            stem.radialSegmentCount = 40
+            let stemMat = SCNMaterial()
+            stemMat.diffuse.contents = color
+            stemMat.emission.contents = color.withAlphaComponent(isAnimated ? 0.18 : 0.05)
+            stemMat.specular.contents = UIColor.white.withAlphaComponent(0.7)
+            stemMat.roughness.contents = NSNumber(value: 0.30)
+            stem.materials = [stemMat]
+            let stemNode = SCNNode(geometry: stem)
+            stemNode.position = SCNVector3(0, Float(stemHeight / 2), 0)
+            stemNode.castsShadow = true
+            root.addChildNode(stemNode)
+
             let sphere = SCNSphere(radius: size)
-            sphere.segmentCount = 24
+            sphere.segmentCount = 48
             let mat = SCNMaterial()
             mat.diffuse.contents  = color
+            mat.emission.contents = isAnimated ? color.withAlphaComponent(0.20) : color.withAlphaComponent(0.06)
             mat.specular.contents = UIColor.white
-            mat.shininess = 60
+            mat.metalness.contents = NSNumber(value: 0.08)
+            mat.roughness.contents = NSNumber(value: 0.34)
+            mat.shininess = 48
             sphere.materials = [mat]
 
             let sphereNode = SCNNode(geometry: sphere)
+            sphereNode.position = SCNVector3(0, Float(stemHeight + size * 0.48), 0)
             sphereNode.castsShadow = true
 
             if isAnimated {
-                let ring = SCNTorus(ringRadius: size * 1.5, pipeRadius: size * 0.15)
-                ring.firstMaterial?.diffuse.contents = color.withAlphaComponent(0.5)
-                ring.firstMaterial?.isDoubleSided = true
-                let ringNode = SCNNode(geometry: ring)
-                root.addChildNode(ringNode)
-
-                let up   = SCNAction.moveBy(x: 0, y: size * 0.8, z: 0, duration: 0.65)
-                let down = SCNAction.moveBy(x: 0, y: -size * 0.8, z: 0, duration: 0.65)
-                up.timingMode = .easeInEaseOut
-                down.timingMode = .easeInEaseOut
-                sphereNode.runAction(.repeatForever(.sequence([up, down])))
+                let pulse = SCNSphere(radius: size * 1.18)
+                pulse.segmentCount = 40
+                let pulseMat = SCNMaterial()
+                pulseMat.diffuse.contents = color.withAlphaComponent(0.10)
+                pulseMat.emission.contents = color.withAlphaComponent(0.22)
+                pulseMat.transparency = 0.18
+                pulse.materials = [pulseMat]
+                let pulseNode = SCNNode(geometry: pulse)
+                pulseNode.position = sphereNode.position
+                pulseNode.castsShadow = false
+                root.addChildNode(pulseNode)
+                pulseNode.runAction(.repeatForever(.sequence([
+                    .scale(to: 1.14, duration: 0.9),
+                    .scale(to: 1.0, duration: 0.9)
+                ])))
             }
 
             root.addChildNode(sphereNode)
 
             if let text = label {
                 let textGeo = SCNText(string: text, extrusionDepth: 0)
-                textGeo.font = UIFont.systemFont(ofSize: size * 1.5, weight: .bold)
+                textGeo.font = UIFont.systemFont(ofSize: size * 1.55, weight: .heavy)
+                textGeo.alignmentMode = CATextLayerAlignmentMode.center.rawValue
                 textGeo.firstMaterial?.diffuse.contents = UIColor.white
+                textGeo.firstMaterial?.emission.contents = UIColor.white.withAlphaComponent(0.18)
+                textGeo.firstMaterial?.specular.contents = UIColor.white
                 textGeo.firstMaterial?.isDoubleSided = true
-                textGeo.flatness = 0.1
+                textGeo.flatness = 0.03
 
                 let textNode = SCNNode(geometry: textGeo)
                 let (minB, maxB) = textNode.boundingBox
-                textNode.position = SCNVector3(x: -(maxB.x - minB.x) / 2, y: Float(size) * 2.5, z: 0)
+                let textWidth = maxB.x - minB.x
+                textNode.position = SCNVector3(x: -textWidth / 2, y: Float(stemHeight + size * 2.25), z: 0)
 
                 let billboard = SCNBillboardConstraint()
                 billboard.freeAxes = .Y
@@ -326,27 +420,16 @@ struct Visitor3DMapView: UIViewRepresentable {
             let sortedSteps = parent.trail.sortedSteps
             guard !sortedSteps.isEmpty else { return }
 
-            for (index, step) in sortedSteps.enumerated() {
+            for step in sortedSteps {
                 let isCompleted = parent.completedPOIIds.contains(step.poi?.id ?? UUID())
                 let isNextActive = step.poi?.id == parent.currentStepPOIId
                 
-                var segmentPoints: [CGPoint] = []
-                
-                if let geom = step.pathGeometry, !geom.isEmpty {
-                    let coords = PolylineCodec.decode(geom)
-                    segmentPoints = coords.map { CGPoint(x: $0.latitude, y: $0.longitude) }
-                } else {
-                    // Fallback to straight line
-                    let startPoint: CGPoint
-                    if index == 0 {
-                        startPoint = CGPoint(x: parent.trail.startX, y: parent.trail.startY)
-                    } else {
-                        let prevPOI = sortedSteps[index - 1].poi
-                        startPoint = CGPoint(x: prevPOI?.x ?? 0, y: prevPOI?.y ?? 0)
-                    }
-                    let endPoint = CGPoint(x: step.poi?.x ?? 0, y: step.poi?.y ?? 0)
-                    segmentPoints = [startPoint, endPoint]
-                }
+                guard
+                    let geom = step.pathGeometry?.trimmingCharacters(in: .whitespacesAndNewlines),
+                    !geom.isEmpty
+                else { continue }
+
+                let segmentPoints = PolylineCodec.decode(geom).map { CGPoint(x: $0.latitude, y: $0.longitude) }
                 
                 guard segmentPoints.count >= 2 else { continue }
                 
@@ -362,18 +445,23 @@ struct Visitor3DMapView: UIViewRepresentable {
                     
                     guard length > 1e-4 else { continue }
                     
-                    let radius: CGFloat = isNextActive ? CGFloat(mapSize) * 0.0025 : CGFloat(mapSize) * 0.0012
+                    let radius: CGFloat = isNextActive ? CGFloat(mapSize) * 0.00125 : CGFloat(mapSize) * 0.00062
                     let cyl = SCNCylinder(radius: radius, height: CGFloat(length))
                     let mat = SCNMaterial()
                     
                     let green = UIColor(WWFDesign.Colors.forestLight)
                     if isCompleted {
-                        mat.diffuse.contents = UIColor.gray.withAlphaComponent(0.35)
+                        mat.diffuse.contents = UIColor(WWFDesign.Colors.cardCream).withAlphaComponent(0.52)
+                        mat.emission.contents = UIColor.white.withAlphaComponent(0.08)
                     } else if isNextActive {
                         mat.diffuse.contents = green
-                        mat.emission.contents = green.withAlphaComponent(0.3) // Light glow
+                        mat.emission.contents = green.withAlphaComponent(0.38)
+                        mat.specular.contents = UIColor.white
+                        mat.metalness.contents = NSNumber(value: 0.12)
+                        mat.roughness.contents = NSNumber(value: 0.24)
                     } else {
-                        mat.diffuse.contents = green.withAlphaComponent(0.8)
+                        mat.diffuse.contents = green.withAlphaComponent(0.46)
+                        mat.emission.contents = green.withAlphaComponent(0.12)
                     }
                     
                     mat.isDoubleSided = true
@@ -382,6 +470,18 @@ struct Visitor3DMapView: UIViewRepresentable {
                     let node = SCNNode(geometry: cyl)
                     node.position = SCNVector3((from3D.x + to3D.x) / 2, (from3D.y + to3D.y) / 2, (from3D.z + to3D.z) / 2)
                     node.name = "trailPath"
+
+                    if isNextActive {
+                        let glow = SCNCylinder(radius: radius * 1.9, height: CGFloat(length))
+                        let glowMat = SCNMaterial()
+                        glowMat.diffuse.contents = green.withAlphaComponent(0.08)
+                        glowMat.emission.contents = green.withAlphaComponent(0.18)
+                        glowMat.transparency = 0.18
+                        glowMat.isDoubleSided = true
+                        glow.materials = [glowMat]
+                        let glowNode = SCNNode(geometry: glow)
+                        node.addChildNode(glowNode)
+                    }
                     
                     let dir = SCNVector3(dx / length, dy / length, dz / length)
                     let dot = upVector.x*dir.x + upVector.y*dir.y + upVector.z*dir.z

@@ -16,6 +16,7 @@ struct NumericCodeEntryView: View {
     @State private var code = ""
     @State private var errorMessage: String?
     @State private var isLoading = false
+    @ObservedObject private var localizer = LocalizationManager.shared
     var allowedPOIIds: Set<UUID>? = nil
     var allowGlobalAlerts: Bool = true
     var onPOIFound: (POI) -> Void
@@ -32,20 +33,20 @@ struct NumericCodeEntryView: View {
                     .accessibilityHidden(true)
 
                 // Title
-                Text("Inserisci il codice del punto di interesse")
+                Text(localizer.localizedString(for: "enter_poi_code"))
                     .font(.headline)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal)
 
                 // Subtitle
-                Text("Il codice a 6 cifre è visibile sotto il QR code del POI")
+                Text(localizer.localizedString(for: "poi_code_hint"))
                     .font(.subheadline)
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal)
 
                 // Code input field
-                TextField("Codice a 6 cifre", text: $code)
+                TextField(localizer.localizedString(for: "six_digit_code"), text: $code)
                     .keyboardType(.numberPad)
                     .font(.largeTitle)
                     .multilineTextAlignment(.center)
@@ -58,8 +59,8 @@ struct NumericCodeEntryView: View {
                         code = String(newValue.prefix(6).filter { $0.isNumber })
                         errorMessage = nil
                     }
-                    .accessibilityLabel("Codice numerico POI")
-                    .accessibilityHint("Inserisci il codice a 6 cifre presente sotto il QR code")
+                    .accessibilityLabel(localizer.localizedString(for: "poi_numeric_code"))
+                    .accessibilityHint(localizer.localizedString(for: "poi_code_accessibility_hint"))
 
                 // Error message
                 if let error = errorMessage {
@@ -71,7 +72,7 @@ struct NumericCodeEntryView: View {
                             .foregroundColor(.orange)
                     }
                     .accessibilityElement(children: .combine)
-                    .accessibilityLabel("Errore: \(error)")
+                    .accessibilityLabel("\(localizer.localizedString(for: "error_prefix")): \(error)")
                 }
 
                 // Confirm button
@@ -81,7 +82,7 @@ struct NumericCodeEntryView: View {
                             .frame(maxWidth: .infinity)
                             .frame(height: 56)
                     } else {
-                        Text("Conferma")
+                        Text(localizer.localizedString(for: "confirm_button"))
                             .font(.headline)
                             .frame(maxWidth: .infinity)
                             .frame(height: 56)
@@ -91,17 +92,17 @@ struct NumericCodeEntryView: View {
                 .tint(.green)
                 .disabled(code.count != 6 || isLoading)
                 .padding(.horizontal, 32)
-                .accessibilityLabel("Conferma codice")
-                .accessibilityHint("Cerca il punto di interesse con il codice inserito")
+                .accessibilityLabel(localizer.localizedString(for: "code_confirmation_accessibility"))
+                .accessibilityHint(localizer.localizedString(for: "code_confirmation_hint"))
 
                 Spacer()
             }
-            .navigationTitle("Codice Manuale")
+            .navigationTitle(localizer.localizedString(for: "manual_code_title"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Chiudi") { dismiss() }
-                        .accessibilityLabel("Chiudi inserimento codice")
+                    Button(localizer.localizedString(for: "close")) { dismiss() }
+                        .accessibilityLabel(localizer.localizedString(for: "close_code_entry"))
                 }
             }
         }
@@ -124,15 +125,15 @@ struct NumericCodeEntryView: View {
                 UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
                 // VoiceOver announcement
                 UIAccessibility.post(notification: .announcement,
-                    argument: "POI trovato: \(poi.localizedName)")
+                    argument: "\(localizer.localizedString(for: "poi_found_announcement")): \(poi.localizedName)")
                 onPOIFound(poi)
                 dismiss()
             } else {
-                errorMessage = "Codice non valido per questo percorso"
+                errorMessage = localizer.localizedString(for: "invalid_code_for_trail")
                 UINotificationFeedbackGenerator().notificationOccurred(.error)
             }
         } catch {
-            errorMessage = "Errore nella ricerca: \(error.localizedDescription)"
+            errorMessage = "\(localizer.localizedString(for: "lookup_error")): \(error.localizedDescription)"
         }
 
         isLoading = false

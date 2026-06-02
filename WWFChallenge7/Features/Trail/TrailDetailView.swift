@@ -82,8 +82,8 @@ struct TrailDetailView: View {
                             
                             // Titolo Percorso
                             Text(trail.localizedName)
-                                .font(Font.custom("Georgia", size: 30, relativeTo: .largeTitle).weight(.bold))
-                                .foregroundColor(Color(red: 0.941, green: 0.929, blue: 0.902))
+                                .font(WWFDesign.Typography.sectionLargeTitle)
+                                .foregroundColor(WWFDesign.Colors.backgroundOffWhite)
                                 .shadow(color: .black.opacity(0.2), radius: 4, x: 0, y: 2)
                         }
                         .padding(20)
@@ -106,7 +106,7 @@ struct TrailDetailView: View {
                                         .clipShape(Circle())
                                     
                                     Image(systemName: "chevron.left")
-                                        .font(.headline)
+                                        .font(WWFDesign.Typography.headline)
                                         .foregroundColor(WWFDesign.Colors.leafLight)
                                         .offset(x: -1)
                                 }
@@ -146,7 +146,7 @@ struct TrailDetailView: View {
                         // Durata
                         HStack(spacing: 6) {
                             Image(systemName: "clock.fill")
-                                .font(.caption)
+                                .font(WWFDesign.Typography.caption)
                                 .foregroundColor(WWFDesign.Colors.forestLight)
                             Text("\(trail.estimatedMinutes ?? 60) min")
                                 .font(WWFDesign.Typography.chipLabel)
@@ -163,7 +163,7 @@ struct TrailDetailView: View {
                         // Tappe
                         HStack(spacing: 6) {
                             Image(systemName: "mappin.and.ellipse")
-                                .font(.caption)
+                                .font(WWFDesign.Typography.caption)
                                 .foregroundColor(WWFDesign.Colors.forestLight)
                             Text("\(trail.steps.count) \(localizer.localizedString(for: "steps_label"))")
                                 .font(WWFDesign.Typography.chipLabel)
@@ -207,7 +207,7 @@ struct TrailDetailView: View {
                     // Warning / Offline mode info
                     HStack(alignment: .top, spacing: 12) {
                         Image(systemName: "wifi.slash")
-                            .font(.headline)
+                            .font(WWFDesign.Typography.headline)
                             .foregroundColor(WWFDesign.Colors.warningText)
                             .padding(.top, 1)
 
@@ -353,7 +353,7 @@ struct TrailStepRowView: View {
                         .fill(WWFDesign.Colors.forestLight)
                         .frame(width: 28, height: 28)
                     Text("\(index + 1)")
-                        .font(.caption.weight(.semibold))
+                        .font(WWFDesign.Typography.caption.weight(.semibold))
                         .foregroundColor(.white)
                 }
                 

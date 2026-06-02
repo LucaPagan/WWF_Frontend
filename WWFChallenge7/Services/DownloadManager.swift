@@ -54,7 +54,7 @@ final class DownloadManager: ObservableObject {
         UserDefaults.standard.set(language, forKey: "preferredLanguage")
 
         do {
-            guard pkg.isReady, pkg.generationStatus == "ready", pkg.manifestSHA256 != nil else {
+            guard pkg.isReady, pkg.generationStatus == "ready" else {
                 throw OfflineDownloadError.packageNotReady
             }
 
@@ -63,17 +63,21 @@ final class DownloadManager: ObservableObject {
             }
 
             guard envelope.manifest.pathId == pkg.pathId,
-                  envelope.manifest.tier == pkg.tier,
-                  envelope.manifest.manifestSHA256 == pkg.manifestSHA256 else {
+                  envelope.manifest.tier == pkg.tier else {
+                throw OfflineDownloadError.invalidManifest
+            }
+            if let bundleManifestSHA256 = envelope.bundleManifestSHA256,
+               bundleManifestSHA256 != envelope.manifest.manifestSHA256 {
                 throw OfflineDownloadError.invalidManifest
             }
 
-            try ensureAvailableSpace(requiredBytes: pkg.sizeBytes)
+            try ensureAvailableSpace(requiredBytes: envelope.bundleSizeBytes ?? pkg.sizeBytes)
 
             let dirs = try directories(for: pkg, manifestSHA: envelope.manifest.manifestSHA256)
             try fileManager.createDirectory(at: dirs.staging, withIntermediateDirectories: true)
             try fileManager.createDirectory(at: dirs.staging.appendingPathComponent("media", isDirectory: true), withIntermediateDirectories: true)
             try fileManager.createDirectory(at: dirs.staging.appendingPathComponent("poi_photos", isDirectory: true), withIntermediateDirectories: true)
+            try fileManager.createDirectory(at: dirs.staging.appendingPathComponent("ar_models", isDirectory: true), withIntermediateDirectories: true)
 
             let state = loadState(at: dirs.stateURL)
                 ?? BundleDownloadState(packageId: pkg.id, manifestSHA256: envelope.manifest.manifestSHA256, completedAssetIds: [], updatedAt: Date())
@@ -82,6 +86,7 @@ final class DownloadManager: ObservableObject {
             try saveManifest(envelope.manifest, to: dirs.manifestURL)
 
             let assets = envelope.manifest.assets
+            completed.formUnion(try prefillReusableAssets(assets, for: pkg, stagingURL: dirs.staging))
             let totalUnits = max(assets.count, 1)
 
             for (index, asset) in assets.enumerated() {
@@ -96,7 +101,7 @@ final class DownloadManager: ObservableObject {
                     try await download(asset: asset, signedURL: assetURL, baseURL: dirs.staging)
                 } catch {
                     let refreshed = try await bundleClient.refreshSignedAssets(pathId: pkg.pathId, tier: pkg.tier)
-                    envelope = BundleEnvelope(manifest: envelope.manifest, signedAssets: refreshed)
+                    envelope = envelope.replacingSignedAssets(refreshed)
                     assetURL = try await signedURL(for: asset, envelope: &envelope, package: pkg)
                     try await download(asset: asset, signedURL: assetURL, baseURL: dirs.staging)
                 }
@@ -114,7 +119,7 @@ final class DownloadManager: ObservableObject {
 
             currentDownloadName = "Salvataggio offline..."
             let installedURL = try commit(staging: dirs.staging, installed: dirs.installed)
-            try persist(manifest: envelope.manifest, package: pkg, installedURL: installedURL)
+            try persist(manifest: envelope.manifest, package: pkg, installedURL: installedURL, bundleSizeBytes: envelope.bundleSizeBytes)
             try? fileManager.removeItem(at: dirs.stateURL)
 
             progress = 1
@@ -136,7 +141,17 @@ final class DownloadManager: ObservableObject {
             predicate: #Predicate { $0.pathId == trailId && $0.isReady == true && $0.generationStatus == "ready" },
             sortBy: [SortDescriptor(\DownloadPackage.sizeBytes)]
         )
-        return (try? context.fetch(descriptor)) ?? []
+        let packages = (try? context.fetch(descriptor)) ?? []
+        var didRecover = false
+        for package in packages where !package.isDownloaded {
+            if recoverInstalledState(for: package, context: context) {
+                didRecover = true
+            }
+        }
+        if didRecover {
+            try? context.save()
+        }
+        return packages
     }
 
     private func recoverInterruptedDownloads() {
@@ -151,12 +166,44 @@ final class DownloadManager: ObservableObject {
         }
     }
 
+    private func recoverInstalledState(for package: DownloadPackage, context: ModelContext) -> Bool {
+        guard let manifestSHA = package.manifestSHA256,
+              let root = try? offlineRoot() else { return false }
+
+        let expectedPath = root
+            .appendingPathComponent("installed", isDirectory: true)
+            .appendingPathComponent("\(package.id.uuidString)-\(manifestSHA)", isDirectory: true)
+
+        guard fileManager.fileExists(atPath: expectedPath.path) else { return false }
+
+        package.localPath = expectedPath.path
+        package.installedManifestSHA256 = manifestSHA
+
+        let packageId = package.id
+        let existingInstall = try? context.fetch(FetchDescriptor<LocalBundleInstall>(
+            predicate: #Predicate { $0.packageId == packageId && $0.manifestSHA256 == manifestSHA }
+        )).first
+
+        if existingInstall == nil {
+            context.insert(LocalBundleInstall(
+                packageId: package.id,
+                pathId: package.pathId,
+                tier: package.tier,
+                manifestSHA256: manifestSHA,
+                installPath: expectedPath.path,
+                sizeBytes: package.sizeBytes
+            ))
+        }
+
+        return true
+    }
+
     private func signedURL(for asset: OfflineBundleAsset, envelope: inout BundleEnvelope, package: DownloadPackage) async throws -> String {
         if let url = envelope.signedAssets[asset.id] {
             return url
         }
         let refreshed = try await bundleClient.refreshSignedAssets(pathId: package.pathId, tier: package.tier)
-        envelope = BundleEnvelope(manifest: envelope.manifest, signedAssets: refreshed)
+        envelope = envelope.replacingSignedAssets(refreshed)
         guard let url = refreshed[asset.id] else {
             throw OfflineDownloadError.missingSignedURL(asset.id)
         }
@@ -214,7 +261,7 @@ final class DownloadManager: ObservableObject {
         return installed
     }
 
-    private func persist(manifest: OfflineBundleManifest, package: DownloadPackage, installedURL: URL) throws {
+    private func persist(manifest: OfflineBundleManifest, package: DownloadPackage, installedURL: URL, bundleSizeBytes: Int64?) throws {
         guard let container = modelContainer else { return }
         let context = ModelContext(container)
         let packageId = package.id
@@ -225,8 +272,10 @@ final class DownloadManager: ObservableObject {
             context.insert(localPackage)
         }
         localPackage.localPath = installedURL.path
+        localPackage.installedManifestSHA256 = manifest.manifestSHA256
         localPackage.manifestSHA256 = manifest.manifestSHA256
         localPackage.manifestVersion = manifest.manifestVersion
+        localPackage.sizeBytes = bundleSizeBytes ?? max(manifest.assets.reduce(Int64(0)) { $0 + $1.sizeBytes }, localPackage.sizeBytes)
         localPackage.assetCount = manifest.assets.count
         localPackage.generationStatus = "ready"
 
@@ -236,6 +285,8 @@ final class DownloadManager: ObservableObject {
         try upsertContents(manifest.contents, manifest: manifest, packageId: packageId, installedURL: installedURL, context: context)
         try upsertTranslations(manifest.translations, context: context)
         try applyPOIPhotos(manifest.assets, installedURL: installedURL, context: context)
+        try applyARModels(manifest.assets, installedURL: installedURL, context: context)
+        try pruneRecordsNotInManifest(manifest, context: context)
 
         let install = LocalBundleInstall(
             packageId: packageId,
@@ -247,6 +298,43 @@ final class DownloadManager: ObservableObject {
         )
         context.insert(install)
         try context.save()
+    }
+
+
+    private func prefillReusableAssets(_ assets: [OfflineBundleAsset], for package: DownloadPackage, stagingURL: URL) throws -> Set<String> {
+        guard let container = modelContainer else { return [] }
+        let context = ModelContext(container)
+        let pathId = package.pathId
+        let installs = (try? context.fetch(FetchDescriptor<LocalBundleInstall>(
+            predicate: #Predicate { $0.pathId == pathId }
+        ))) ?? []
+        var completed: Set<String> = []
+
+        for asset in assets {
+            let destination = stagingURL.appendingPathComponent(asset.localRelativePath)
+            if try assetIsValid(asset, baseURL: stagingURL) {
+                completed.insert(asset.id)
+                continue
+            }
+
+            for install in installs where install.tier.includes(package.tier) || package.tier.includes(install.tier) {
+                let sourceBase = URL(fileURLWithPath: install.installPath, isDirectory: true)
+                let source = sourceBase.appendingPathComponent(asset.localRelativePath)
+                guard fileManager.fileExists(atPath: source.path) else { continue }
+                try fileManager.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
+                if fileManager.fileExists(atPath: destination.path) {
+                    try fileManager.removeItem(at: destination)
+                }
+                try fileManager.copyItem(at: source, to: destination)
+                if try assetIsValid(asset, baseURL: stagingURL) {
+                    completed.insert(asset.id)
+                    break
+                }
+                try? fileManager.removeItem(at: destination)
+            }
+        }
+
+        return completed
     }
 
     private func upsertPath(_ data: [String: JSONValue], context: ModelContext) throws {
@@ -358,6 +446,49 @@ final class DownloadManager: ObservableObject {
         }
     }
 
+    private func applyARModels(_ assets: [OfflineBundleAsset], installedURL: URL, context: ModelContext) throws {
+        for asset in assets where asset.kind == "poi_ar_model" {
+            guard let poiId = asset.poiId else { continue }
+            let descriptor = FetchDescriptor<POI>(predicate: #Predicate { $0.id == poiId })
+            guard let poi = try context.fetch(descriptor).first else { continue }
+            let url = installedURL.appendingPathComponent(asset.localRelativePath)
+            if fileManager.fileExists(atPath: url.path) {
+                poi.arModelURL = url.path
+            }
+        }
+    }
+
+    private func pruneRecordsNotInManifest(_ manifest: OfflineBundleManifest, context: ModelContext) throws {
+        let pathId = manifest.pathId
+        let manifestStepIds = Set(manifest.pathSteps.compactMap { uuid($0["id"]) })
+        let manifestContentIds = Set(manifest.contents.compactMap { uuid($0["id"]) })
+        let manifestPOIIds = Set((manifest.pois + manifest.globalAlerts).compactMap { uuid($0["id"]) })
+        let manifestTranslationIds = Set(manifest.translations.compactMap { uuid($0["id"]) })
+
+        if let trail = try context.fetch(FetchDescriptor<Trail>(predicate: #Predicate { $0.id == pathId })).first {
+            for step in trail.steps where !manifestStepIds.contains(step.id) {
+                context.delete(step)
+            }
+            trail.steps.removeAll { !manifestStepIds.contains($0.id) }
+        }
+
+        let localContents = try context.fetch(FetchDescriptor<Content>())
+        for content in localContents where manifestPOIIds.contains(content.poiId) && !manifestContentIds.contains(content.id) {
+            context.delete(content)
+        }
+
+        let localTranslations = try context.fetch(FetchDescriptor<LocalTranslation>())
+        for translation in localTranslations
+        where manifestPOIIds.contains(translation.recordId)
+            || translation.recordId == pathId
+            || manifestStepIds.contains(translation.recordId)
+            || manifestContentIds.contains(translation.recordId) {
+            if !manifestTranslationIds.contains(translation.id) {
+                context.delete(translation)
+            }
+        }
+    }
+
     private func createPOI(_ data: [String: JSONValue]) -> POI? {
         guard let id = uuid(data["id"]),
               let name = string(data["name"]),
@@ -379,6 +510,9 @@ final class DownloadManager: ObservableObject {
             numericCode: string(data["numeric_code"]),
             descriptionKids: string(data["description_kids"]),
             descriptionEasyRead: string(data["description_easy_read"]),
+            arModelURL: string(data["ar_model_url"]),
+            arAnimationConfig: jsonString(data["ar_animation_config"]),
+            arModelTier: ContentTier(rawValue: string(data["ar_model_tier"]) ?? "") ?? .full,
             fixedID: id
         )
         poi.qrPayload = string(data["qr_payload"]) ?? poi.qrPayload
@@ -457,6 +591,18 @@ final class DownloadManager: ObservableObject {
     }
 
     private func string(_ value: JSONValue?) -> String? { value?.stringValue }
+    private func jsonString(_ value: JSONValue?) -> String? {
+        guard let value else { return nil }
+        if let string = value.stringValue { return string }
+        guard case .null = value else {
+            let object = value.foundationObject
+            guard JSONSerialization.isValidJSONObject(object),
+                  let data = try? JSONSerialization.data(withJSONObject: object),
+                  let string = String(data: data, encoding: .utf8) else { return nil }
+            return string
+        }
+        return nil
+    }
     private func int(_ value: JSONValue?) -> Int? { value?.intValue }
     private func double(_ value: JSONValue?) -> Double? { value?.doubleValue }
     private func bool(_ value: JSONValue?) -> Bool? { value?.boolValue }

@@ -11,56 +11,62 @@ import SwiftUI
 
 struct AccessibilitySettingsView: View {
     @EnvironmentObject var prefs: AccessibilityPreferences
+    @ObservedObject private var localizer = LocalizationManager.shared
 
     var body: some View {
         Form {
             // MARK: - Text & Reading
             Section {
                 Toggle(isOn: $prefs.easyReadMode) {
-                    Label("Testo semplificato (Easy-to-Read)", systemImage: "text.badge.checkmark")
+                    Label(localizer.localizedString(for: "easy_read_label"), systemImage: "text.badge.checkmark")
+                        .font(WWFDesign.Typography.bodyLargeRounded)
                 }
-                .accessibilityLabel("Testo semplificato Easy-to-Read")
-                .accessibilityHint("Mostra versioni semplificate dei contenuti dei punti di interesse, con frasi brevi e vocabolario semplice")
+                .accessibilityLabel(localizer.localizedString(for: "easy_read_accessibility_label"))
+                .accessibilityHint(localizer.localizedString(for: "easy_read_accessibility_hint"))
 
                 Toggle(isOn: $prefs.kidsMode) {
-                    Label("Modalità bambini", systemImage: "figure.and.child.holdinghands")
+                    Label(localizer.localizedString(for: "kids_mode_label"), systemImage: "figure.and.child.holdinghands")
+                        .font(WWFDesign.Typography.bodyLargeRounded)
                 }
-                .accessibilityLabel("Modalità bambini")
-                .accessibilityHint("Mostra solo percorsi adatti ai bambini con icone grandi e linguaggio semplice")
+                .accessibilityLabel(localizer.localizedString(for: "kids_mode_label"))
+                .accessibilityHint(localizer.localizedString(for: "kids_mode_accessibility_hint"))
             } header: {
-                Text("Testo e Lettura")
+                Text(localizer.localizedString(for: "text_and_reading"))
             } footer: {
-                Text("Il testo semplificato segue le linee guida Easy-to-Read europee per rendere i contenuti accessibili a tutti.")
+                Text(localizer.localizedString(for: "simplified_text_desc"))
             }
 
             // MARK: - Navigation
             Section {
                 Toggle(isOn: $prefs.preferListView) {
-                    Label("Vista lista come predefinita", systemImage: "list.bullet")
+                    Label(localizer.localizedString(for: "default_list_view"), systemImage: "list.bullet")
+                        .font(WWFDesign.Typography.bodyLargeRounded)
                 }
-                .accessibilityLabel("Vista lista come predefinita")
-                .accessibilityHint("Mostra il percorso come lista di istruzioni testuali invece della mappa visiva")
+                .accessibilityLabel(localizer.localizedString(for: "default_list_view"))
+                .accessibilityHint(localizer.localizedString(for: "default_list_view_hint"))
             } header: {
-                Text("Navigazione")
+                Text(localizer.localizedString(for: "navigation_label"))
             } footer: {
-                Text("La vista lista è consigliata per utenti con lettore di schermo. Si attiva automaticamente quando VoiceOver è attivo.")
+                Text(localizer.localizedString(for: "list_view_desc"))
             }
 
             // MARK: - Audio & Feedback
             Section {
                 Toggle(isOn: $prefs.autoAudio) {
-                    Label("Audio automatico al QR", systemImage: "speaker.wave.2")
+                    Label(localizer.localizedString(for: "auto_audio_qr"), systemImage: "speaker.wave.2")
+                        .font(WWFDesign.Typography.bodyLargeRounded)
                 }
-                .accessibilityLabel("Avvia audio automaticamente alla scansione QR")
-                .accessibilityHint("Quando scansioni un QR code, avvia automaticamente la descrizione audio del punto di interesse")
+                .accessibilityLabel(localizer.localizedString(for: "auto_audio_qr"))
+                .accessibilityHint(localizer.localizedString(for: "auto_audio_qr_hint"))
 
                 Toggle(isOn: $prefs.hapticFeedback) {
-                    Label("Vibrazione al riconoscimento", systemImage: "iphone.radiowaves.left.and.right")
+                    Label(localizer.localizedString(for: "recognition_haptics"), systemImage: "iphone.radiowaves.left.and.right")
+                        .font(WWFDesign.Typography.bodyLargeRounded)
                 }
-                .accessibilityLabel("Vibrazione al riconoscimento QR")
-                .accessibilityHint("Attiva una vibrazione quando il QR code viene riconosciuto con successo")
+                .accessibilityLabel(localizer.localizedString(for: "recognition_haptics"))
+                .accessibilityHint(localizer.localizedString(for: "recognition_haptics_hint"))
             } header: {
-                Text("Audio e Feedback")
+                Text(localizer.localizedString(for: "audio_feedback"))
             }
 
             // MARK: - Info
@@ -71,19 +77,20 @@ struct AccessibilitySettingsView: View {
                         .foregroundColor(.green)
                         .frame(width: 44, height: 44)
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("Accessibilità di sistema")
-                            .font(.subheadline)
-                            .fontWeight(.medium)
-                        Text("Per impostazioni avanzate come VoiceOver, Dynamic Type e Aumenta Contrasto, usa Impostazioni > Accessibilità del tuo dispositivo.")
-                            .font(.caption)
+                        Text(localizer.localizedString(for: "system_accessibility"))
+                            .font(WWFDesign.Typography.bodyLargeRounded.weight(.semibold))
+                        Text(localizer.localizedString(for: "system_accessibility_desc"))
+                            .font(WWFDesign.Typography.caption)
                             .foregroundColor(.secondary)
                     }
                 }
                 .accessibilityElement(children: .combine)
-                .accessibilityLabel("Per impostazioni avanzate di accessibilità come VoiceOver e Dynamic Type, vai nelle Impostazioni di sistema del dispositivo, sezione Accessibilità")
+                .accessibilityLabel(localizer.localizedString(for: "system_accessibility_desc"))
             }
         }
-        .navigationTitle("Accessibilità")
+        .scrollContentBackground(.hidden)
+        .background(WWFDesign.Colors.backgroundCream)
+        .navigationTitle(localizer.localizedString(for: "accessibility"))
         .navigationBarTitleDisplayMode(.large)
     }
 }

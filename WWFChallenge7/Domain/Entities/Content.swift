@@ -155,6 +155,18 @@ enum ContentTier: String, Codable, CaseIterable {
         case .full:     return "~100 MB"
         }
     }
+
+    var rank: Int {
+        switch self {
+        case .light: return 0
+        case .standard: return 1
+        case .full: return 2
+        }
+    }
+
+    func includes(_ other: ContentTier) -> Bool {
+        rank >= other.rank
+    }
 }
 
 // MARK: - Offline Extensions
@@ -162,8 +174,8 @@ enum ContentTier: String, Codable, CaseIterable {
 extension Content {
     var localFileName: String {
         var ext = ""
-        if let urlStr = fileURL, let url = URL(string: urlStr) {
-            ext = url.pathExtension
+        if let urlStr = fileURL {
+            ext = (urlStr as NSString).pathExtension
         }
         if ext.isEmpty {
             switch contentType {

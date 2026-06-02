@@ -38,6 +38,7 @@ struct POIModalView: View {
     // Gallery States
     @State private var selectedGalleryItemId: String? = nil
     @State private var showFullScreenGallery = false
+    @State private var showARViewer = false
 
     init(poi: POI, onContinue: (() -> Void)? = nil) {
         self.poi = poi
@@ -50,6 +51,18 @@ struct POIModalView: View {
 
     var accentColor: Color {
         poi.type.color
+    }
+
+    private var descriptionText: String {
+        poi.adaptiveDescription(
+            kidsMode: accessibilityPrefs.kidsMode,
+            easyReadMode: accessibilityPrefs.easyReadMode
+        )
+    }
+
+    private var hasARModel: Bool {
+        guard let arModelURL = poi.arModelURL else { return false }
+        return !arModelURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     private var galleryItems: [GalleryItem] {
@@ -92,7 +105,7 @@ struct POIModalView: View {
                         uiImage: uiImg,
                         remoteURLStr: content.fileURL,
                         localURL: content.localFileURL,
-                        title: content.contentType.displayName
+                        title: localizer.localizedString(for: "content_type_" + content.contentType.rawValue)
                     )
                 )
             }
@@ -102,172 +115,294 @@ struct POIModalView: View {
     }
 
     var body: some View {
-        NavigationStack {
+        ZStack(alignment: .topTrailing) {
+            WWFDesign.Colors.backgroundCream.ignoresSafeArea()
+
             ScrollView(showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 20) {
+                    organicHeader
 
-                    // Premium Volcanic Header (Themed with POI accent color)
-                    ZStack(alignment: .bottomLeading) {
-                        RoundedRectangle(cornerRadius: WWFDesign.Radius.card)
-                            .fill(WWFDesign.Colors.forestDark)
-                            .frame(height: 130)
+                    coverPhotoButton
 
-                        // Pattern organico — cerchi sfumati che evocano vegetazione con colore dell'accento
-                        GeometryReader { geo in
-                            ZStack {
-                                Circle()
-                                    .fill(accentColor)
-                                    .frame(width: 140, height: 140)
-                                    .blur(radius: 35)
-                                    .offset(x: geo.size.width * 0.65, y: -20)
-                                    .opacity(0.5)
+                    POIOrganicCard(shadowColor: accentColor.opacity(0.34)) {
+                        VStack(alignment: .leading, spacing: 14) {
+                            HStack(alignment: .center, spacing: 12) {
+                                Text(localizer.localizedString(for: "description"))
+                                    .font(WWFDesign.Typography.sectionTitle)
+                                    .foregroundColor(.black)
+
+                                Spacer(minLength: 8)
+
+                                audioButton
                             }
+
+                            Text(descriptionText)
+                                .font(accessibilityPrefs.easyReadMode ? WWFDesign.Typography.bodyLargeRounded : WWFDesign.Typography.trailDescBody)
+                                .foregroundColor(.black.opacity(0.82))
+                                .lineSpacing(accessibilityPrefs.easyReadMode ? 7 : 5)
+                                .fixedSize(horizontal: false, vertical: true)
                         }
-                        .clipShape(RoundedRectangle(cornerRadius: WWFDesign.Radius.card))
-
-                        HStack(spacing: 16) {
-                            ZStack {
-                                Circle()
-                                    .fill(accentColor.opacity(0.25))
-                                    .background(.ultraThinMaterial)
-                                    .overlay(
-                                        Circle().stroke(accentColor.opacity(0.4), lineWidth: 0.5)
-                                    )
-                                    .clipShape(Circle())
-                                
-                                Image(systemName: poi.type.icon)
-                                    .font(.title3)
-                                    .foregroundColor(.white)
-                            }
-                            .frame(width: 52, height: 52)
-                            
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(poi.localizedName)
-                                    .font(Font.custom("Georgia", size: 20, relativeTo: .title3).weight(.bold))
-                                    .foregroundColor(.white)
-                                
-                                Text(localizer.localizedString(for: "poi_type_" + poi.type.rawValue))
-                                    .font(WWFDesign.Typography.badge)
-                                    .fontWeight(.bold)
-                                    .foregroundColor(accentColor)
-                                    .padding(.horizontal, 8)
-                                    .padding(.vertical, 3)
-                                    .background(accentColor.opacity(0.15))
-                                    .clipShape(Capsule())
-                            }
-                            Spacer()
-                        }
-                        .padding(16)
                     }
                     .padding(.horizontal)
-                    .padding(.top)
 
-                    // Photo (Cover)
-                    Button {
-                        selectedGalleryItemId = "cover"
-                        showFullScreenGallery = true
-                    } label: {
-                        if let data = poi.photoData, let uiImg = UIImage(data: data) {
-                            Image(uiImage: uiImg)
-                                .resizable()
-                                .scaledToFill()
-                                .frame(maxWidth: .infinity)
-                                .frame(height: 200)
-                                .clipShape(RoundedRectangle(cornerRadius: WWFDesign.Radius.card))
-                                .padding(.horizontal)
-                        } else if let urlStr = poi.photoURL {
-                            RemoteImageView(urlStr: urlStr)
-                                .padding(.horizontal)
-                        }
-                    }
-                    .buttonStyle(PlainButtonStyle())
-
-                    // Description & Audio Reader
-                    VStack(alignment: .leading, spacing: 12) {
-                        HStack {
-                            Text(localizer.localizedString(for: "description"))
-                                .font(WWFDesign.Typography.sectionTitle)
-                                .foregroundColor(WWFDesign.Colors.forestDark)
-                            Spacer()
-                            Button {
-                                viewModel.toggleAudio(
-                                    text: poi.adaptiveDescription(kidsMode: accessibilityPrefs.kidsMode, easyReadMode: accessibilityPrefs.easyReadMode),
-                                    languageCode: localizer.preferredLanguage
-                                )
-                            } label: {
-                                Image(systemName: viewModel.isSpeaking ? "stop.circle.fill" : "speaker.wave.2.circle.fill")
-                                    .font(.title2)
-                                    .foregroundColor(accentColor)
-                            }
-                        }
-                        
-                        Text(poi.adaptiveDescription(kidsMode: accessibilityPrefs.kidsMode, easyReadMode: accessibilityPrefs.easyReadMode))
-                            .font(WWFDesign.Typography.trailDesc)
-                            .foregroundColor(.secondary)
-                            .lineSpacing(4)
-                    }
-                    .padding(16)
-                    .background(Color(.systemBackground))
-                    .clipShape(RoundedRectangle(cornerRadius: WWFDesign.Radius.card))
-                    .shadow(color: Color.black.opacity(0.03), radius: 4, x: 0, y: 2)
-                    .padding(.horizontal)
-
-                    // Extra Media (Tiered Content)
                     POIMediaGallery(contents: contents) { itemId in
                         selectedGalleryItemId = itemId
                         showFullScreenGallery = true
                     }
                     .padding(.horizontal)
 
-                    // Updated Position Badge
+                    if hasARModel {
+                        Button {
+                            showARViewer = true
+                        } label: {
+                            Label(localizer.localizedString(for: "open_ar"), systemImage: "camera.viewfinder")
+                                .font(WWFDesign.Typography.headline)
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(POIOrganicButtonStyle(fill: accentColor, shadow: WWFDesign.Colors.accentAmbra))
+                        .padding(.horizontal)
+                        .accessibilityLabel(localizer.localizedString(for: "open_ar_accessibility_label"))
+                        .accessibilityHint(localizer.localizedString(for: "open_ar_accessibility_hint"))
+                    }
+
                     HStack(spacing: 8) {
                         Image(systemName: "location.fill.viewfinder")
-                            .foregroundColor(WWFDesign.Colors.leafGreen)
-                            .font(.subheadline)
+                            .font(WWFDesign.Typography.subheadline)
                         Text(localizer.localizedString(for: "position_updated_on_map"))
-                            .font(WWFDesign.Typography.metaLabel)
-                            .foregroundColor(WWFDesign.Colors.leafGreen)
-                            .fontWeight(.medium)
+                            .font(WWFDesign.Typography.chipLabel)
+                            .fontWeight(.semibold)
                     }
+                    .foregroundColor(WWFDesign.Colors.easyText)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(WWFDesign.Colors.easyFill)
+                    .clipShape(Capsule())
+                    .overlay(Capsule().stroke(WWFDesign.Colors.organicOutline.opacity(0.28), lineWidth: 1))
                     .padding(.horizontal)
 
-                    // Continue CTA
                     Button {
                         onContinue?() ?? dismiss()
                     } label: {
                         Label(localizer.localizedString(for: "continue_trail"), systemImage: "arrow.right.circle.fill")
-                            .font(.headline)
-                            .foregroundColor(.white)
+                            .font(WWFDesign.Typography.headline)
                             .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(WWFDesign.Colors.forestMid)
-                            .clipShape(RoundedRectangle(cornerRadius: WWFDesign.Radius.card))
-                            .shadow(color: WWFDesign.Colors.forestMid.opacity(0.2), radius: 6, x: 0, y: 3)
                     }
+                    .buttonStyle(POIOrganicButtonStyle(fill: WWFDesign.Colors.forestMid, shadow: accentColor))
                     .padding(.horizontal)
-                    .padding(.bottom, 32)
+                    .padding(.bottom, 34)
+                    .accessibilityLabel(localizer.localizedString(for: "continue_trail"))
+                    .accessibilityHint(localizer.localizedString(for: "continue_trail_accessibility_hint"))
                 }
+                .padding(.top, 16)
             }
-            .background(Color(.systemGroupedBackground).ignoresSafeArea())
-            .navigationTitle(poi.localizedName)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(localizer.localizedString(for: "close")) {
-                        onContinue?() ?? dismiss()
-                    }
-                    .foregroundColor(WWFDesign.Colors.forestMid)
-                }
+
+            Button {
+                onContinue?() ?? dismiss()
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 15, weight: .black))
+                    .foregroundColor(.black)
+                    .frame(width: 42, height: 42)
+                    .background(Color.white)
+                    .clipShape(Circle())
+                    .overlay(Circle().stroke(WWFDesign.Colors.organicOutline.opacity(0.30), lineWidth: 1.1))
+                    .shadow(color: WWFDesign.Colors.forestDark.opacity(0.08), radius: 6, x: 0, y: 3)
             }
-            .fullScreenCover(isPresented: $showFullScreenGallery) {
-                FullScreenGalleryView(items: galleryItems, selectedItemId: $selectedGalleryItemId)
-                    .environmentObject(viewModel)
-            }
-            .onDisappear {
-                // Removed voiceService.stop() to allow audio to play in background
-            }
+            .buttonStyle(.plain)
+            .padding(.top, 14)
+            .padding(.trailing, 18)
+            .accessibilityLabel(localizer.localizedString(for: "close"))
+            .accessibilityHint(localizer.localizedString(for: "close_modal_accessibility_hint"))
         }
         .environmentObject(viewModel)
+        .fullScreenCover(isPresented: $showFullScreenGallery) {
+            FullScreenGalleryView(items: galleryItems, selectedItemId: $selectedGalleryItemId)
+                .environmentObject(viewModel)
+        }
+        .fullScreenCover(isPresented: $showARViewer) {
+            POIARView(poi: poi)
+        }
+        .onDisappear {
+            // Removed voiceService.stop() to allow audio to play in background
+        }
+    }
+
+    private var organicHeader: some View {
+        ZStack(alignment: .bottomLeading) {
+            POIHeaderBlobShape()
+                .fill(accentColor)
+                .overlay(POIHeaderBlobShape().stroke(WWFDesign.Colors.organicOutline.opacity(0.32), lineWidth: 1.3))
+                .shadow(color: WWFDesign.Colors.forestDark.opacity(0.10), radius: 9, x: 0, y: 4)
+
+            CardBlobShape()
+                .fill(Color.white.opacity(0.18))
+                .frame(width: 160)
+                .offset(x: -10)
+                .accessibilityHidden(true)
+
+            HStack(alignment: .center, spacing: 16) {
+                ZStack {
+                    Circle()
+                        .fill(Color.white)
+                    Circle()
+                        .stroke(WWFDesign.Colors.organicOutline.opacity(0.30), lineWidth: 1.2)
+                    Image(systemName: poi.type.icon)
+                        .font(.title2.weight(.bold))
+                        .foregroundColor(WWFDesign.Colors.forestDark)
+                }
+                .frame(width: 58, height: 58)
+                .shadow(color: WWFDesign.Colors.forestDark.opacity(0.08), radius: 6, x: 0, y: 3)
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(poi.localizedName)
+                        .font(Font.custom("Georgia", size: 22, relativeTo: .title2).weight(.bold))
+                        .foregroundColor(.black)
+                        .lineLimit(3)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .minimumScaleFactor(0.82)
+
+                    Text(localizer.localizedString(for: "poi_type_" + poi.type.rawValue))
+                        .font(WWFDesign.Typography.badge)
+                        .fontWeight(.bold)
+                        .foregroundColor(WWFDesign.Colors.forestDark)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(Color.white.opacity(0.88))
+                        .clipShape(Capsule())
+                        .overlay(Capsule().stroke(WWFDesign.Colors.organicOutline.opacity(0.24), lineWidth: 1))
+                }
+            }
+            .padding(.leading, 22)
+            .padding(.trailing, 72)
+            .padding(.bottom, 24)
+        }
+        .frame(height: 154)
+        .padding(.horizontal)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(poi.localizedName). \(localizer.localizedString(for: "poi_type_" + poi.type.rawValue))")
+    }
+
+    @ViewBuilder
+    private var coverPhotoButton: some View {
+        Button {
+            selectedGalleryItemId = "cover"
+            showFullScreenGallery = true
+        } label: {
+            ZStack {
+                if let data = poi.photoData, let uiImg = UIImage(data: data) {
+                    Image(uiImage: uiImg)
+                        .resizable()
+                        .scaledToFill()
+                } else if let urlStr = poi.photoURL {
+                    RemoteImageView(urlStr: urlStr)
+                } else {
+                    Image(systemName: "photo")
+                        .font(.largeTitle)
+                        .foregroundColor(WWFDesign.Colors.forestMid.opacity(0.45))
+                        .frame(maxWidth: .infinity)
+                        .background(WWFDesign.Colors.easyFill)
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 210)
+            .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 28, style: .continuous).stroke(WWFDesign.Colors.organicOutline.opacity(0.24), lineWidth: 1))
+            .shadow(color: WWFDesign.Colors.forestDark.opacity(0.08), radius: 9, x: 0, y: 4)
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal)
+        .accessibilityLabel(localizer.localizedString(for: "main_photo"))
+        .accessibilityHint(localizer.localizedString(for: "open_gallery_accessibility_hint"))
+    }
+
+    private var audioButton: some View {
+        Button {
+            viewModel.toggleAudio(
+                text: descriptionText,
+                languageCode: localizer.preferredLanguage
+            )
+        } label: {
+            Image(systemName: viewModel.isSpeaking ? "stop.fill" : "speaker.wave.2.fill")
+                .font(.system(size: 16, weight: .bold))
+                .frame(width: 40, height: 40)
+        }
+        .buttonStyle(POIOrganicButtonStyle(fill: Color.white, foreground: .black, shadow: accentColor, verticalPadding: 0))
+        .accessibilityLabel(viewModel.isSpeaking ? localizer.localizedString(for: "stop_audio_accessibility_label") : localizer.localizedString(for: "start_audio_accessibility_label"))
+        .accessibilityHint(localizer.localizedString(for: "audio_reading_accessibility_hint"))
+    }
+}
+
+private struct POIHeaderBlobShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        let w = rect.width
+        let h = rect.height
+
+        path.move(to: CGPoint(x: w * 0.04, y: h * 0.12))
+        path.addCurve(to: CGPoint(x: w * 0.78, y: h * 0.03),
+                      control1: CGPoint(x: w * 0.24, y: -h * 0.04),
+                      control2: CGPoint(x: w * 0.56, y: h * 0.07))
+        path.addCurve(to: CGPoint(x: w * 0.98, y: h * 0.34),
+                      control1: CGPoint(x: w * 0.94, y: 0),
+                      control2: CGPoint(x: w, y: h * 0.13))
+        path.addCurve(to: CGPoint(x: w * 0.88, y: h * 0.86),
+                      control1: CGPoint(x: w * 0.96, y: h * 0.57),
+                      control2: CGPoint(x: w * 0.99, y: h * 0.75))
+        path.addCurve(to: CGPoint(x: w * 0.42, y: h * 0.96),
+                      control1: CGPoint(x: w * 0.72, y: h * 1.02),
+                      control2: CGPoint(x: w * 0.54, y: h * 0.88))
+        path.addCurve(to: CGPoint(x: w * 0.04, y: h * 0.78),
+                      control1: CGPoint(x: w * 0.22, y: h * 1.07),
+                      control2: CGPoint(x: -w * 0.02, y: h * 0.96))
+        path.addCurve(to: CGPoint(x: w * 0.04, y: h * 0.12),
+                      control1: CGPoint(x: w * 0.10, y: h * 0.52),
+                      control2: CGPoint(x: -w * 0.05, y: h * 0.30))
+        path.closeSubpath()
+        return path
+    }
+}
+
+private struct POIOrganicCard<ContentView: View>: View {
+    var shadowColor: Color = WWFDesign.Colors.leafGreen.opacity(0.35)
+    @ViewBuilder var content: () -> ContentView
+
+    var body: some View {
+        content()
+            .padding(20)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background {
+                ZStack(alignment: .topTrailing) {
+                    Color.white
+                    OrganicBlobShape(variant: 0)
+                        .fill(shadowColor.opacity(0.18))
+                        .frame(width: 110, height: 80)
+                        .offset(x: 30, y: -24)
+                }
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 28, style: .continuous).stroke(WWFDesign.Colors.organicOutline.opacity(0.20), lineWidth: 1))
+            .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous).stroke(WWFDesign.Colors.organicInset.opacity(0.62), lineWidth: 1).padding(4))
+            .shadow(color: WWFDesign.Colors.forestDark.opacity(0.07), radius: 8, x: 0, y: 3)
+    }
+}
+
+private struct POIOrganicButtonStyle: ButtonStyle {
+    var fill: Color
+    var foreground: Color = .white
+    var shadow: Color = WWFDesign.Colors.accentAmbra
+    var verticalPadding: CGFloat = 15
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .foregroundColor(foreground)
+            .padding(.horizontal, 16)
+            .padding(.vertical, verticalPadding)
+            .background(fill)
+            .clipShape(Capsule())
+            .overlay(Capsule().stroke(WWFDesign.Colors.organicOutline.opacity(0.24), lineWidth: 1))
+            .shadow(color: WWFDesign.Colors.forestDark.opacity(configuration.isPressed ? 0.04 : 0.09), radius: configuration.isPressed ? 4 : 8, x: 0, y: configuration.isPressed ? 1 : 3)
+            .scaleEffect(configuration.isPressed ? 0.98 : 1)
+            .animation(.spring(response: 0.22, dampingFraction: 0.72), value: configuration.isPressed)
     }
 }
 
@@ -275,18 +410,21 @@ struct POIModalView: View {
 struct POIMediaGallery: View {
     let contents: [Content]
     let onSelectImageOrVideo: (String) -> Void
+    @ObservedObject private var localizer = LocalizationManager.shared
 
     var body: some View {
         if !contents.isEmpty {
-            VStack(alignment: .leading, spacing: 12) {
-                Text(LocalizationManager.shared.localizedString(for: "extra_content"))
-                    .font(WWFDesign.Typography.sectionTitle)
-                    .foregroundColor(WWFDesign.Colors.forestDark)
-                
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 12) {
-                        ForEach(contents) { content in
-                            ContentThumbnailView(content: content, onSelectImageOrVideo: onSelectImageOrVideo)
+            POIOrganicCard(shadowColor: WWFDesign.Colors.accentAmbra.opacity(0.35)) {
+                VStack(alignment: .leading, spacing: 14) {
+                    Text(localizer.localizedString(for: "extra_content"))
+                        .font(WWFDesign.Typography.sectionTitle)
+                        .foregroundColor(.black)
+
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 14) {
+                            ForEach(contents) { content in
+                                ContentThumbnailView(content: content, onSelectImageOrVideo: onSelectImageOrVideo)
+                            }
                         }
                     }
                 }
@@ -299,6 +437,11 @@ struct ContentThumbnailView: View {
     let content: Content
     let onSelectImageOrVideo: (String) -> Void
     @State private var showSheet = false
+    @ObservedObject private var localizer = LocalizationManager.shared
+
+    private var localizedTypeName: String {
+        localizer.localizedString(for: "content_type_" + content.contentType.rawValue)
+    }
 
     var body: some View {
         Button {
@@ -331,10 +474,13 @@ struct ContentThumbnailView: View {
             }
             .overlay(
                 RoundedRectangle(cornerRadius: WWFDesign.Radius.card)
-                    .stroke(Color.gray.opacity(0.2), lineWidth: 1)
+                    .stroke(WWFDesign.Colors.organicOutline.opacity(0.24), lineWidth: 1)
             )
+            .shadow(color: WWFDesign.Colors.forestDark.opacity(0.06), radius: 6, x: 0, y: 3)
         }
         .buttonStyle(PlainButtonStyle())
+        .accessibilityLabel(localizedTypeName)
+        .accessibilityHint(localizer.localizedString(for: "media_thumbnail_accessibility_hint"))
         .sheet(isPresented: $showSheet) {
             MediaDetailView(content: content)
         }
@@ -345,12 +491,13 @@ struct ContentThumbnailView: View {
             Image(systemName: content.contentType.icon)
                 .font(.title)
                 .foregroundColor(WWFDesign.Colors.forestLight)
-            Text(content.contentType.displayName)
+            Text(localizedTypeName)
                 .font(WWFDesign.Typography.metaLabel)
-                .foregroundColor(.secondary)
+                .fontWeight(.semibold)
+                .foregroundColor(.black.opacity(0.72))
         }
         .frame(width: 140, height: 100)
-        .background(WWFDesign.Colors.forestLight.opacity(0.06))
+        .background(WWFDesign.Colors.easyFill)
         .clipShape(RoundedRectangle(cornerRadius: WWFDesign.Radius.card))
     }
 }
@@ -409,6 +556,8 @@ struct FullScreenGalleryView: View {
                             .background(Color.black.opacity(0.4))
                             .clipShape(Circle())
                     }
+                    .accessibilityLabel(LocalizationManager.shared.localizedString(for: "close"))
+                    .accessibilityHint(LocalizationManager.shared.localizedString(for: "close_gallery_accessibility_hint"))
                 }
                 .padding()
 
@@ -513,7 +662,8 @@ struct GalleryVideoPlayerView: View {
             let p = AVPlayer(url: localURL)
             self.player = p
             p.play()
-        } else if let urlStr = remoteURLStr, let remoteURL = URL(string: urlStr) {
+        } else if let urlStr = remoteURLStr,
+                  let remoteURL = SupabaseConfig.shared.publicStorageURL(for: urlStr) {
             let p = AVPlayer(url: remoteURL)
             self.player = p
             p.play()
@@ -557,7 +707,8 @@ struct MediaDetailView: View {
                         }
                     }
                 } else {
-                    if let remoteURLStr = content.fileURL, let remoteURL = URL(string: remoteURLStr) {
+                    if let remoteURLStr = content.fileURL,
+                       let remoteURL = SupabaseConfig.shared.publicStorageURL(for: remoteURLStr) {
                         switch content.contentType {
                         case .image:
                             EmptyView() // Handled in fullscreen gallery
@@ -607,7 +758,7 @@ struct MediaDetailView: View {
                     }
                 }
             }
-            .navigationTitle(content.contentType.displayName)
+            .navigationTitle(LocalizationManager.shared.localizedString(for: "content_type_" + content.contentType.rawValue))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {

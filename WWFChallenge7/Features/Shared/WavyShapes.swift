@@ -114,6 +114,47 @@ struct CardBlobShape: Shape {
     }
 }
 
+// MARK: - Shared Organic Blob
+struct OrganicBlobShape: Shape {
+    let variant: Int
+
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        let w = rect.width
+        let h = rect.height
+
+        switch variant % 4 {
+        case 0:
+            path.move(to: CGPoint(x: w * 0.10, y: h * 0.05))
+            path.addCurve(to: CGPoint(x: w * 0.92, y: h * 0.09), control1: CGPoint(x: w * 0.32, y: -h * 0.02), control2: CGPoint(x: w * 0.72, y: h * 0.01))
+            path.addCurve(to: CGPoint(x: w * 0.95, y: h * 0.82), control1: CGPoint(x: w * 1.02, y: h * 0.28), control2: CGPoint(x: w * 1.01, y: h * 0.63))
+            path.addCurve(to: CGPoint(x: w * 0.14, y: h * 0.95), control1: CGPoint(x: w * 0.72, y: h * 1.03), control2: CGPoint(x: w * 0.34, y: h * 1.01))
+            path.addCurve(to: CGPoint(x: w * 0.10, y: h * 0.05), control1: CGPoint(x: -w * 0.02, y: h * 0.76), control2: CGPoint(x: -w * 0.02, y: h * 0.22))
+        case 1:
+            path.move(to: CGPoint(x: w * 0.08, y: h * 0.14))
+            path.addCurve(to: CGPoint(x: w * 0.86, y: h * 0.05), control1: CGPoint(x: w * 0.27, y: h * 0.00), control2: CGPoint(x: w * 0.65, y: -h * 0.02))
+            path.addCurve(to: CGPoint(x: w * 0.98, y: h * 0.72), control1: CGPoint(x: w * 1.02, y: h * 0.20), control2: CGPoint(x: w * 1.03, y: h * 0.52))
+            path.addCurve(to: CGPoint(x: w * 0.24, y: h * 0.94), control1: CGPoint(x: w * 0.78, y: h * 0.98), control2: CGPoint(x: w * 0.45, y: h * 1.02))
+            path.addCurve(to: CGPoint(x: w * 0.08, y: h * 0.14), control1: CGPoint(x: w * 0.02, y: h * 0.86), control2: CGPoint(x: -w * 0.03, y: h * 0.36))
+        case 2:
+            path.move(to: CGPoint(x: w * 0.16, y: h * 0.04))
+            path.addCurve(to: CGPoint(x: w * 0.95, y: h * 0.18), control1: CGPoint(x: w * 0.35, y: h * 0.11), control2: CGPoint(x: w * 0.78, y: -h * 0.05))
+            path.addCurve(to: CGPoint(x: w * 0.84, y: h * 0.92), control1: CGPoint(x: w * 1.03, y: h * 0.38), control2: CGPoint(x: w * 1.01, y: h * 0.78))
+            path.addCurve(to: CGPoint(x: w * 0.08, y: h * 0.82), control1: CGPoint(x: w * 0.60, y: h * 1.06), control2: CGPoint(x: w * 0.23, y: h * 0.99))
+            path.addCurve(to: CGPoint(x: w * 0.16, y: h * 0.04), control1: CGPoint(x: -w * 0.02, y: h * 0.62), control2: CGPoint(x: -w * 0.01, y: h * 0.18))
+        default:
+            path.move(to: CGPoint(x: w * 0.07, y: h * 0.22))
+            path.addCurve(to: CGPoint(x: w * 0.74, y: h * 0.05), control1: CGPoint(x: w * 0.21, y: h * 0.03), control2: CGPoint(x: w * 0.55, y: -h * 0.01))
+            path.addCurve(to: CGPoint(x: w * 0.96, y: h * 0.62), control1: CGPoint(x: w * 0.93, y: h * 0.11), control2: CGPoint(x: w * 1.04, y: h * 0.42))
+            path.addCurve(to: CGPoint(x: w * 0.30, y: h * 0.96), control1: CGPoint(x: w * 0.84, y: h * 0.92), control2: CGPoint(x: w * 0.53, y: h * 1.04))
+            path.addCurve(to: CGPoint(x: w * 0.07, y: h * 0.22), control1: CGPoint(x: w * 0.06, y: h * 0.88), control2: CGPoint(x: -w * 0.04, y: h * 0.48))
+        }
+
+        path.closeSubpath()
+        return path
+    }
+}
+
 // MARK: - Teardrop Pin Shape
 struct TeardropPinShape: Shape {
     func path(in rect: CGRect) -> Path {

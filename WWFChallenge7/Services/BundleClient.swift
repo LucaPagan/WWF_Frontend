@@ -64,8 +64,13 @@ final class BundleClient {
         }
         let manifestData = try JSONSerialization.data(withJSONObject: manifestObject)
         let manifest = try decoder.decode(OfflineBundleManifest.self, from: manifestData)
+        let bundle = response["bundle"] as? [String: Any]
         return BundleEnvelope(
             manifest: manifest,
+            bundleManifestSHA256: bundle?["manifest_sha256"] as? String,
+            bundleSizeBytes: Self.int64Value(bundle?["size_bytes"]),
+            bundleAssetCount: bundle?["asset_count"] as? Int,
+            generatedAt: Self.dateValue(bundle?["generated_at"], decoder: decoder),
             signedAssets: try decodeSignedAssets(response)
         )
     }
@@ -81,5 +86,22 @@ final class BundleClient {
             }
         }
         return signed
+    }
+
+    private static func int64Value(_ value: Any?) -> Int64? {
+        if let int64 = value as? Int64 { return int64 }
+        if let int = value as? Int { return Int64(int) }
+        if let number = value as? NSNumber { return number.int64Value }
+        if let string = value as? String, let parsed = Int64(string) { return parsed }
+        return nil
+    }
+
+    private static func dateValue(_ value: Any?, decoder: JSONDecoder) -> Date? {
+        guard let string = value as? String,
+              let data = try? JSONSerialization.data(withJSONObject: [string]),
+              let dates = try? decoder.decode([Date].self, from: data) else {
+            return nil
+        }
+        return dates.first
     }
 }
